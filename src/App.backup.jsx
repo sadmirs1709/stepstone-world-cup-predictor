@@ -1,0 +1,2308 @@
+import React, { useEffect, useMemo, useState } from "react";
+
+const STORAGE_KEY = "stepstone-world-cup-predictor-final";
+
+const DEFAULT_PARTICIPANTS = [
+  { id: 1, name: "Sadmir", email: "" },
+  { id: 2, name: "Colleague A", email: "" },
+  { id: 3, name: "Colleague B", email: "" },
+];
+
+const DEFAULT_MATCHES = [
+  {
+    id: 1,
+    round: "Group Stage",
+    home: "Brazil",
+    away: "Japan",
+    kickoff: "2026-06-11 18:00",
+    result: "",
+  },
+  {
+    id: 2,
+    round: "Group Stage",
+    home: "Germany",
+    away: "Mexico",
+    kickoff: "2026-06-12 21:00",
+    result: "",
+  },
+  {
+    id: 3,
+    round: "Group Stage",
+    home: "France",
+    away: "USA",
+    kickoff: "2026-06-13 18:00",
+    result: "",
+  },
+  {
+    id: 4,
+    round: "Group Stage",
+    home: "Spain",
+    away: "Serbia",
+    kickoff: "2026-06-14 21:00",
+    result: "",
+  },
+];
+
+const DEFAULT_PREDICTIONS = {
+  1: { 1: "1", 2: "X", 3: "1", 4: "2" },
+  2: { 1: "1", 2: "2", 3: "X", 4: "1" },
+  3: { 1: "X", 2: "2", 3: "1", 4: "2" },
+};
+
+const DEFAULT_CHAMPIONS = {
+  1: "Brazil",
+  2: "France",
+  3: "Spain",
+};
+
+const RULES = [
+  "Each participant can submit only one entry.",
+  "Predictions are only 1 / X / 2 and apply to the result after regular 90 minutes.",
+  "Correct outcome = 1 point. Incorrect outcome = 0 points.",
+  "For knockout matches, extra time and penalties are not considered.",
+  "If points are equal, the tie-breaker is the predicted tournament champion.",
+  "If still tied, the participant with more correct picks ranks higher, then alphabetical order applies.",
+];
+
+function createDefaultState() {
+  return {
+    competitionName: "StepStone World Cup Predictor 2026",
+    lockRegistration: false,
+    lockPredictions: true,
+    pointsPerHit: 1,
+    actualChampion: "",
+    participants: DEFAULT_PARTICIPANTS.map((p) => ({ ...p })),
+    matches: DEFAULT_MATCHES.map((m) => ({ ...m })),
+    predictions: JSON.parse(JSON.stringify(DEFAULT_PREDICTIONS)),
+    championTiebreak: { ...DEFAULT_CHAMPIONS },
+  };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return createDefaultState();
+    const parsed = JSON.parse(raw);
+    const fallback = createDefaultState();
+    return {
+      ...fallback,
+      ...parsed,
+      participants: parsed.participants || fallback.participants,
+      matches: parsed.matches || fallback.matches,
+      predictions: parsed.predictions || fallback.predictions,
+      championTiebreak: parsed.championTiebreak || fallback.championTiebreak,
+    };
+  } catch {
+    return createDefaultState();
+  }
+}
+
+function parseKickoff(value) {
+  if (!value) return null;
+  const normalized = value.replace(" ", "T");
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDateTime(value) {
+  const date = parseKickoff(value);
+  if (!date) return value || "—";
+  return date.toLocaleString("en-GB", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function outcomeLabel(value, match) {
+  if (value === "1") return `${match.home} win`;
+  if (value === "X") return "Draw";
+  if (value === "2") return `${match.away} win`;
+  return "—";
+}
+
+function outcomeBadge(value, match) {
+  if (value === "1") return match.home;
+  if (value === "X") return "X";
+  if (value === "2") return match.away;
+  return "—";
+}
+
+function exportCsv(filename, rows) {
+  const csv = rows
+    .map((row) =>
+      row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")
+    )
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.setAttribute("download", filename);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function Panel({ title, children }) {
+  return (
+    <section className="panel">
+      <div className="panel-title">{title}</div>
+      {children}
+    </section>
+  );
+}
+
+function StatCard({ label, value, dark = false }) {
+  return (
+    <div className={`stat-card ${dark ? "stat-card-dark" : ""}`}>
+      <div className={`stat-label ${dark ? "stat-label-dark" : ""}`}>{label}</div>
+      <div className="stat-value">{value}</div>
+    </div>
+  );
+}
+
+function StatusBadge({ tone = "slate", text }) {
+  return <span className={`badge badge-${tone}`}>{text}</span>;
+}
+
+function StatusPill({ label, value }) {
+  return (
+    <div className="status-pill">
+      <div className="status-pill-label">{label}</div>
+      <div className="status-pill-value">{value}</div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [state, setState] = useState(loadState);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [selectedParticipantId, setSelectedParticipantId] = useState(
+    () => loadState().participants?.[0]?.id || 1
+  );
+  const [selectedRound, setSelectedRound] = useState("All");
+  const [newParticipant, setNewParticipant] = useState({ name: "", email: "" });
+  const [newMatch, setNewMatch] = useState({
+    round: "Group Stage",
+    home: "",
+    away: "",
+    kickoff: "",
+  });
+  const [bulkImportText, setBulkImportText] = useState("");
+  const [summaryText, setSummaryText] = useState("");
+  const [summaryCopied, setSummaryCopied] = useState(false);
+
+  const {
+    competitionName,
+    lockRegistration,
+    lockPredictions,
+    pointsPerHit,
+    actualChampion,
+    participants,
+    matches,
+    predictions,
+    championTiebreak,
+  } = state;
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, [state]);
+
+  const updateState = (patch) => {
+    setState((prev) => ({ ...prev, ...patch }));
+  };
+
+  const rounds = useMemo(() => {
+    const unique = Array.from(new Set(matches.map((m) => m.round)));
+    return ["All", ...unique];
+  }, [matches]);
+
+  const filteredMatches = useMemo(() => {
+    if (selectedRound === "All") return matches;
+    return matches.filter((m) => m.round === selectedRound);
+  }, [matches, selectedRound]);
+
+  const isLocked = (match) => {
+    if (!lockPredictions) return false;
+    const kickoffDate = parseKickoff(match.kickoff);
+    if (!kickoffDate) return false;
+    return new Date() >= kickoffDate;
+  };
+
+  const leaderboard = useMemo(() => {
+    const rows = participants.map((participant) => {
+      let points = 0;
+      let hits = 0;
+      let entered = 0;
+
+      for (const match of matches) {
+        const pick = predictions[participant.id]?.[match.id];
+        if (pick) entered += 1;
+        if (pick && match.result && pick === match.result) {
+          points += pointsPerHit;
+          hits += 1;
+        }
+      }
+
+      const championPick = championTiebreak[participant.id] || "";
+      const championHit =
+        actualChampion &&
+        championPick &&
+        championPick.trim().toLowerCase() ===
+          actualChampion.trim().toLowerCase()
+          ? 1
+          : 0;
+
+      return {
+        ...participant,
+        points,
+        hits,
+        entered,
+        completion: matches.length
+          ? Math.round((entered / matches.length) * 100)
+          : 0,
+        championPick: championPick || "—",
+        championHit,
+      };
+    });
+
+    rows.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.championHit !== a.championHit) return b.championHit - a.championHit;
+      if (b.hits !== a.hits) return b.hits - a.hits;
+      return a.name.localeCompare(b.name);
+    });
+
+    return rows;
+  }, [
+    participants,
+    matches,
+    predictions,
+    championTiebreak,
+    actualChampion,
+    pointsPerHit,
+  ]);
+
+  const standingsByRound = useMemo(() => {
+    const result = {};
+    for (const round of rounds.filter((r) => r !== "All")) {
+      result[round] = participants
+        .map((participant) => {
+          const roundMatches = matches.filter((m) => m.round === round);
+          const hits = roundMatches.filter(
+            (m) => m.result && predictions[participant.id]?.[m.id] === m.result
+          ).length;
+
+          return {
+            participantId: participant.id,
+            name: participant.name,
+            hits,
+            points: hits * pointsPerHit,
+          };
+        })
+        .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+    }
+    return result;
+  }, [rounds, participants, matches, predictions, pointsPerHit]);
+
+  const completedMatches = matches.filter((m) => m.result).length;
+  const lockedMatches = matches.filter((m) => isLocked(m)).length;
+  const openMatches = matches.length - lockedMatches;
+  const totalPredictions = participants.length * matches.length;
+  const enteredPredictions = participants.reduce((acc, participant) => {
+    return acc + Object.values(predictions[participant.id] || {}).filter(Boolean).length;
+  }, 0);
+
+  const selectedParticipant =
+    participants.find((p) => p.id === selectedParticipantId) || participants[0];
+
+  const nextOpenMatch = useMemo(() => {
+    return matches
+      .filter((m) => !isLocked(m))
+      .sort(
+        (a, b) =>
+          (parseKickoff(a.kickoff)?.getTime() || 0) -
+          (parseKickoff(b.kickoff)?.getTime() || 0)
+      )[0];
+  }, [matches, lockPredictions]);
+
+  const lastSettledMatches = useMemo(() => {
+    return matches.filter((m) => m.result).slice(-5).reverse();
+  }, [matches]);
+
+  const addParticipant = () => {
+    if (lockRegistration) return;
+
+    const name = newParticipant.name.trim();
+    const email = newParticipant.email.trim();
+    if (!name) return;
+
+    const nextId = participants.length
+      ? Math.max(...participants.map((p) => p.id)) + 1
+      : 1;
+
+    updateState({
+      participants: [...participants, { id: nextId, name, email }],
+      predictions: {
+        ...predictions,
+        [nextId]: {},
+      },
+      championTiebreak: {
+        ...championTiebreak,
+        [nextId]: "",
+      },
+    });
+
+    setNewParticipant({ name: "", email: "" });
+    setSelectedParticipantId(nextId);
+  };
+
+  const removeParticipant = (participantId) => {
+    if (lockRegistration) return;
+
+    const remaining = participants.filter((p) => p.id !== participantId);
+    const nextPredictions = { ...predictions };
+    delete nextPredictions[participantId];
+
+    const nextChampionTiebreak = { ...championTiebreak };
+    delete nextChampionTiebreak[participantId];
+
+    updateState({
+      participants: remaining,
+      predictions: nextPredictions,
+      championTiebreak: nextChampionTiebreak,
+    });
+
+    if (selectedParticipantId === participantId) {
+      setSelectedParticipantId(remaining[0]?.id || 1);
+    }
+  };
+
+  const addMatch = () => {
+    const round = newMatch.round.trim();
+    const home = newMatch.home.trim();
+    const away = newMatch.away.trim();
+    const kickoff = newMatch.kickoff.trim();
+
+    if (!round || !home || !away || !kickoff) return;
+
+    const nextId = matches.length ? Math.max(...matches.map((m) => m.id)) + 1 : 1;
+
+    updateState({
+      matches: [
+        ...matches,
+        {
+          id: nextId,
+          round,
+          home,
+          away,
+          kickoff,
+          result: "",
+        },
+      ],
+    });
+
+    setNewMatch({
+      round: "Group Stage",
+      home: "",
+      away: "",
+      kickoff: "",
+    });
+  };
+
+  const removeMatch = (matchId) => {
+    const nextMatches = matches.filter((m) => m.id !== matchId);
+    const nextPredictions = {};
+
+    for (const participantId of Object.keys(predictions)) {
+      nextPredictions[participantId] = { ...predictions[participantId] };
+      delete nextPredictions[participantId][matchId];
+    }
+
+    updateState({
+      matches: nextMatches,
+      predictions: nextPredictions,
+    });
+  };
+
+  const setMatchResult = (matchId, value) => {
+    updateState({
+      matches: matches.map((match) =>
+        match.id === matchId ? { ...match, result: value } : match
+      ),
+    });
+  };
+
+  const updatePrediction = (participantId, matchId, value) => {
+    const match = matches.find((m) => m.id === matchId);
+    if (match && isLocked(match)) return;
+
+    updateState({
+      predictions: {
+        ...predictions,
+        [participantId]: {
+          ...(predictions[participantId] || {}),
+          [matchId]: value,
+        },
+      },
+    });
+  };
+
+  const updateChampionTiebreak = (participantId, value) => {
+    updateState({
+      championTiebreak: {
+        ...championTiebreak,
+        [participantId]: value,
+      },
+    });
+  };
+
+  const importMatches = () => {
+    const lines = bulkImportText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (!lines.length) return;
+
+    let nextId = matches.length ? Math.max(...matches.map((m) => m.id)) + 1 : 1;
+    const imported = [];
+
+    for (const line of lines) {
+      const parts = line.split("|").map((part) => part.trim());
+      if (parts.length < 4) continue;
+
+      imported.push({
+        id: nextId++,
+        round: parts[0],
+        home: parts[1],
+        away: parts[2],
+        kickoff: parts[3],
+        result: "",
+      });
+    }
+
+    if (!imported.length) return;
+
+    updateState({
+      matches: [...matches, ...imported],
+    });
+
+    setBulkImportText("");
+  };
+
+  const exportLeaderboardCsv = () => {
+    const rows = [
+      [
+        "Rank",
+        "Name",
+        "Email",
+        "Points",
+        "Correct Picks",
+        "Completion %",
+        "Predicted Champion",
+        "Tie-break Hit",
+      ],
+      ...leaderboard.map((row, index) => [
+        index + 1,
+        row.name,
+        row.email || "",
+        row.points,
+        row.hits,
+        row.completion,
+        row.championPick,
+        row.championHit ? "YES" : "NO",
+      ]),
+    ];
+
+    exportCsv("leaderboard.csv", rows);
+  };
+
+  const exportPredictionsCsv = () => {
+    const header = ["Participant", ...matches.map((m) => `${m.home} vs ${m.away}`)];
+    const rows = participants.map((participant) => [
+      participant.name,
+      ...matches.map((match) =>
+        outcomeBadge(predictions[participant.id]?.[match.id] || "", match)
+      ),
+    ]);
+
+    exportCsv("predictions_matrix.csv", [header, ...rows]);
+  };
+
+  const generateDailySummaryText = () => {
+    const lines = [];
+    lines.push(`🏆 ${competitionName} — Daily Leaderboard`);
+    lines.push("");
+
+    const ranked = leaderboard.slice(0, 5);
+    if (ranked.length) {
+      lines.push("Top 5:");
+      ranked.forEach((row, index) => {
+        lines.push(
+          `${index + 1}. ${row.name} — ${row.points} points (${row.hits} correct picks, ${row.completion}% completion)`
+        );
+      });
+      lines.push("");
+    }
+
+    if (lastSettledMatches.length) {
+      lines.push("Latest completed matches:");
+      lastSettledMatches.forEach((match) => {
+        lines.push(
+          `- ${match.home} vs ${match.away} → ${outcomeLabel(match.result, match)}`
+        );
+      });
+      lines.push("");
+    }
+
+    if (nextOpenMatch) {
+      lines.push(
+        `Next open match: ${nextOpenMatch.home} vs ${nextOpenMatch.away} (${formatDateTime(
+          nextOpenMatch.kickoff
+        )})`
+      );
+      lines.push("");
+    }
+
+    lines.push(`Completed matches: ${completedMatches}/${matches.length}`);
+    lines.push(`Predictions entered: ${enteredPredictions}/${totalPredictions}`);
+    return lines.join("\n");
+  };
+
+  const generateAndCopySummary = async () => {
+    const text = generateDailySummaryText();
+    setSummaryText(text);
+    setSummaryCopied(false);
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setSummaryCopied(true);
+      }
+    } catch {
+      setSummaryCopied(false);
+    }
+  };
+
+  const resetCompetition = () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to reset the competition? This will restore the demo data."
+    );
+    if (!confirmed) return;
+
+    localStorage.removeItem(STORAGE_KEY);
+    const resetState = createDefaultState();
+    setState(resetState);
+    setActiveTab("overview");
+    setSelectedParticipantId(resetState.participants[0].id);
+    setSelectedRound("All");
+    setNewParticipant({ name: "", email: "" });
+    setNewMatch({
+      round: "Group Stage",
+      home: "",
+      away: "",
+      kickoff: "",
+    });
+    setBulkImportText("");
+    setSummaryText("");
+    setSummaryCopied(false);
+  };
+
+  return (
+    <>
+      <style>{css}</style>
+
+      <div className="app-shell">
+        <div className="app-container">
+          <section className="dashboard-hero">
+            <div className="dashboard-main">
+              <div className="dashboard-badge">Final Office Version</div>
+              <h1 className="dashboard-title">{competitionName}</h1>
+              <p className="dashboard-subtitle">
+                Internal 1 / X / 2 office prediction tracker for tournament outcome
+                picks, leaderboard management, daily updates, and team-wide visibility.
+              </p>
+
+              <div className="status-strip">
+                <StatusPill
+                  label="Registration"
+                  value={lockRegistration ? "Locked" : "Open"}
+                />
+                <StatusPill
+                  label="Predictions"
+                  value={lockPredictions ? "Lock at kickoff" : "Open editing"}
+                />
+                <StatusPill
+                  label="Scoring"
+                  value={`${pointsPerHit} point per correct outcome`}
+                />
+              </div>
+            </div>
+
+            <div className="dashboard-side">
+              <StatCard label="Participants" value={participants.length} dark />
+              <StatCard label="Matches" value={matches.length} dark />
+              <StatCard label="Open" value={openMatches} dark />
+              <StatCard label="Locked" value={lockedMatches} dark />
+              <StatCard label="Completed" value={completedMatches} dark />
+              <StatCard
+                label="Predictions"
+                value={`${enteredPredictions}/${totalPredictions}`}
+                dark
+              />
+            </div>
+          </section>
+
+          <section className="top-summary">
+            <div className="summary-card">
+              <div className="summary-label">Current leader</div>
+              <div className="summary-value">{leaderboard[0]?.name || "—"}</div>
+              <div className="summary-meta">
+                {leaderboard[0] ? `${leaderboard[0].points} points` : "No data yet"}
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-label">Next open match</div>
+              <div className="summary-value small">
+                {nextOpenMatch
+                  ? `${nextOpenMatch.home} vs ${nextOpenMatch.away}`
+                  : "No open matches"}
+              </div>
+              <div className="summary-meta">
+                {nextOpenMatch ? formatDateTime(nextOpenMatch.kickoff) : "—"}
+              </div>
+            </div>
+
+            <div className="summary-card">
+              <div className="summary-label">Competition status</div>
+              <div className="summary-value small">
+                {completedMatches}/{matches.length} completed
+              </div>
+              <div className="summary-meta">
+                {enteredPredictions} prediction entries captured
+              </div>
+            </div>
+          </section>
+
+          <section className="tabs-wrap">
+            {[
+              ["overview", "Overview"],
+              ["participants", "Participants"],
+              ["matches", "Matches"],
+              ["predictions", "Predictions"],
+              ["matrix", "Matrix"],
+              ["leaderboard", "Leaderboard"],
+              ["communications", "Communications"],
+              ["admin", "Admin"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                className={`tab-btn ${activeTab === key ? "tab-btn-active" : ""}`}
+                onClick={() => setActiveTab(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </section>
+
+          {activeTab === "overview" && (
+            <div className="grid-3">
+              <Panel title="How it works">
+                <ol className="ordered-list">
+                  <li>Add participants or keep the placeholders for now.</li>
+                  <li>Add matches manually or import them in bulk.</li>
+                  <li>Each participant predicts only 1 / X / 2.</li>
+                  <li>Enter the actual result after the match ends.</li>
+                  <li>The leaderboard updates automatically.</li>
+                </ol>
+              </Panel>
+
+              <Panel title="Official rules">
+                <div className="rule-list">
+                  {RULES.map((rule, index) => (
+                    <div key={index} className="rule-item">
+                      <div className="rule-index">{index + 1}.</div>
+                      <div>{rule}</div>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+
+              <Panel title="Top 5 right now">
+                <div className="stack-10">
+                  {leaderboard.slice(0, 5).map((row, index) => (
+                    <div key={row.id} className="rank-card">
+                      <div>
+                        <div className="rank-position">#{index + 1}</div>
+                        <div className="rank-name">{row.name}</div>
+                        <div className="rank-meta">
+                          Correct picks: {row.hits} · Completion: {row.completion}%
+                        </div>
+                      </div>
+                      <div className="rank-points-block">
+                        <div className="rank-points">{row.points}</div>
+                        <div className="rank-meta">points</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            </div>
+          )}
+
+          {activeTab === "participants" && (
+            <div className="grid-2">
+              <Panel title="Add participant">
+                <div className="form-grid-3">
+                  <input
+                    className="input"
+                    placeholder="Participant name"
+                    value={newParticipant.name}
+                    disabled={lockRegistration}
+                    onChange={(e) =>
+                      setNewParticipant((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                  />
+                  <input
+                    className="input"
+                    placeholder="Email (optional)"
+                    value={newParticipant.email}
+                    disabled={lockRegistration}
+                    onChange={(e) =>
+                      setNewParticipant((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                  />
+                  <button
+                    className={`btn-primary ${lockRegistration ? "btn-disabled" : ""}`}
+                    disabled={lockRegistration}
+                    onClick={addParticipant}
+                  >
+                    Add
+                  </button>
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <StatusBadge
+                    tone={lockRegistration ? "amber" : "green"}
+                    text={lockRegistration ? "Registration locked" : "Registration open"}
+                  />
+                </div>
+              </Panel>
+
+              <Panel title="Participant list">
+                <div className="stack-10">
+                  {participants.map((participant) => (
+                    <div key={participant.id} className="list-row">
+                      <div>
+                        <div className="list-title">{participant.name}</div>
+                        <div className="list-meta">{participant.email || "No email"}</div>
+                      </div>
+                      <button
+                        className={`btn-danger ${lockRegistration ? "btn-disabled" : ""}`}
+                        disabled={lockRegistration}
+                        onClick={() => removeParticipant(participant.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            </div>
+          )}
+
+          {activeTab === "matches" && (
+            <div className="grid-2">
+              <Panel title="Add match">
+                <div className="form-grid-2">
+                  <select
+                    className="input"
+                    value={newMatch.round}
+                    onChange={(e) =>
+                      setNewMatch((prev) => ({ ...prev, round: e.target.value }))
+                    }
+                  >
+                    <option>Group Stage</option>
+                    <option>Round of 16</option>
+                    <option>Quarter-finals</option>
+                    <option>Semi-finals</option>
+                    <option>Final</option>
+                  </select>
+
+                  <input
+                    className="input"
+                    placeholder="2026-06-15 18:00"
+                    value={newMatch.kickoff}
+                    onChange={(e) =>
+                      setNewMatch((prev) => ({ ...prev, kickoff: e.target.value }))
+                    }
+                  />
+
+                  <input
+                    className="input"
+                    placeholder="Home team"
+                    value={newMatch.home}
+                    onChange={(e) =>
+                      setNewMatch((prev) => ({ ...prev, home: e.target.value }))
+                    }
+                  />
+
+                  <input
+                    className="input"
+                    placeholder="Away team"
+                    value={newMatch.away}
+                    onChange={(e) =>
+                      setNewMatch((prev) => ({ ...prev, away: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <button className="btn-primary mt-12" onClick={addMatch}>
+                  Add match
+                </button>
+
+                <div className="section-top-gap">
+                  <div className="section-subtitle">Bulk import</div>
+                  <div className="small-muted">
+                    Use one line per match in this format:
+                    <br />
+                    <strong>Round | Home Team | Away Team | 2026-06-15 18:00</strong>
+                  </div>
+
+                  <textarea
+                    className="input textarea"
+                    placeholder="Group Stage | Argentina | Croatia | 2026-06-16 21:00"
+                    value={bulkImportText}
+                    onChange={(e) => setBulkImportText(e.target.value)}
+                  />
+
+                  <button className="btn-secondary mt-10" onClick={importMatches}>
+                    Import matches
+                  </button>
+                </div>
+              </Panel>
+
+              <Panel title="Match list">
+                <div className="stack-12">
+                  {matches.map((match) => (
+                    <div key={match.id} className="match-card">
+                      <div className="match-header">
+                        <div>
+                          <div className="match-round">{match.round}</div>
+                          <div className="match-title">
+                            {match.home} vs {match.away}
+                          </div>
+                          <div className="match-kickoff">{formatDateTime(match.kickoff)}</div>
+                        </div>
+
+                        <div className="stack-8">
+                          <StatusBadge
+                            tone={isLocked(match) ? "slate" : "green"}
+                            text={isLocked(match) ? "Locked" : "Open"}
+                          />
+                          <button className="btn-danger" onClick={() => removeMatch(match.id)}>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="button-row-wrap">
+                        <button
+                          className={`btn-outcome ${
+                            match.result === "1" ? "btn-outcome-active" : ""
+                          }`}
+                          onClick={() => setMatchResult(match.id, "1")}
+                        >
+                          {match.home}
+                        </button>
+
+                        <button
+                          className={`btn-outcome ${
+                            match.result === "X" ? "btn-outcome-active" : ""
+                          }`}
+                          onClick={() => setMatchResult(match.id, "X")}
+                        >
+                          X
+                        </button>
+
+                        <button
+                          className={`btn-outcome ${
+                            match.result === "2" ? "btn-outcome-active" : ""
+                          }`}
+                          onClick={() => setMatchResult(match.id, "2")}
+                        >
+                          {match.away}
+                        </button>
+
+                        <button className="btn-secondary" onClick={() => setMatchResult(match.id, "")}>
+                          Reset
+                        </button>
+                      </div>
+
+                      <div className="match-result-text">
+                        Actual result: <strong>{outcomeLabel(match.result, match)}</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            </div>
+          )}
+
+          {activeTab === "predictions" && (
+            <div className="grid-predictions">
+              <Panel title="Controls">
+                <div className="stack-14">
+                  <div>
+                    <label className="label">Participant</label>
+                    <select
+                      className="input"
+                      value={selectedParticipantId}
+                      onChange={(e) => setSelectedParticipantId(Number(e.target.value))}
+                    >
+                      {participants.map((participant) => (
+                        <option key={participant.id} value={participant.id}>
+                          {participant.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">Round filter</label>
+                    <select
+                      className="input"
+                      value={selectedRound}
+                      onChange={(e) => setSelectedRound(e.target.value)}
+                    >
+                      {rounds.map((round) => (
+                        <option key={round} value={round}>
+                          {round}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">Tie-breaker: predicted champion</label>
+                    <input
+                      className="input"
+                      placeholder="e.g. Brazil"
+                      value={championTiebreak[selectedParticipantId] || ""}
+                      onChange={(e) =>
+                        updateChampionTiebreak(selectedParticipantId, e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="info-box">
+                    {lockPredictions
+                      ? "Predictions are automatically locked at kickoff."
+                      : "Prediction locking is currently disabled."}
+                  </div>
+                </div>
+              </Panel>
+
+              <Panel title={`Predictions — ${selectedParticipant?.name || "Participant"}`}>
+                <div className="stack-12">
+                  {filteredMatches.map((match) => {
+                    const currentPick =
+                      predictions[selectedParticipantId]?.[match.id] || "";
+                    const locked = isLocked(match);
+
+                    return (
+                      <div key={match.id} className="match-card">
+                        <div className="match-header">
+                          <div>
+                            <div className="match-round">{match.round}</div>
+                            <div className="match-title">
+                              {match.home} vs {match.away}
+                            </div>
+                            <div className="match-kickoff">{formatDateTime(match.kickoff)}</div>
+                          </div>
+
+                          <StatusBadge
+                            tone={locked ? "slate" : "green"}
+                            text={locked ? "Locked" : "Open"}
+                          />
+                        </div>
+
+                        <div className="button-row-wrap">
+                          {["1", "X", "2"].map((option) => (
+                            <button
+                              key={option}
+                              className={`btn-outcome ${
+                                currentPick === option ? "btn-outcome-dark-active" : ""
+                              } ${locked ? "btn-disabled" : ""}`}
+                              disabled={locked}
+                              onClick={() =>
+                                updatePrediction(selectedParticipantId, match.id, option)
+                              }
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="match-result-text">
+                          Current prediction:{" "}
+                          <strong>{outcomeLabel(currentPick, match)}</strong>
+                        </div>
+
+                        {match.result ? (
+                          <div className="match-result-text">
+                            Actual result:{" "}
+                            <strong>{outcomeLabel(match.result, match)}</strong>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Panel>
+            </div>
+          )}
+
+          {activeTab === "matrix" && (
+            <div className="grid-1">
+              <Panel title="Prediction matrix">
+                <div className="toolbar-between">
+                  <div className="small-muted">
+                    Sticky matrix layout for easier cross-checking across participants and matches.
+                  </div>
+
+                  <div className="toolbar-wrap">
+                    <select
+                      className="input input-small"
+                      value={selectedRound}
+                      onChange={(e) => setSelectedRound(e.target.value)}
+                    >
+                      {rounds.map((round) => (
+                        <option key={round} value={round}>
+                          {round}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button className="btn-secondary" onClick={exportPredictionsCsv}>
+                      Export CSV
+                    </button>
+                  </div>
+                </div>
+
+                <div className="matrix-wrap">
+                  <table className="matrix-table">
+                    <thead>
+                      <tr>
+                        <th className="sticky-col sticky-head matrix-left-head">
+                          Participant
+                        </th>
+                        {filteredMatches.map((match) => (
+                          <th key={match.id} className="sticky-head matrix-head-cell">
+                            <div className="matrix-head-title">
+                              {match.home} vs {match.away}
+                            </div>
+                            <div className="matrix-head-meta">{match.round}</div>
+                            <div className="matrix-head-meta">{formatDateTime(match.kickoff)}</div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {participants.map((participant) => (
+                        <tr key={participant.id}>
+                          <td className="sticky-col matrix-participant-cell">
+                            <div className="matrix-participant-name">
+                              {participant.name}
+                            </div>
+                            <div className="matrix-participant-meta">
+                              {participant.email || "No email"}
+                            </div>
+                          </td>
+
+                          {filteredMatches.map((match) => {
+                            const pick = predictions[participant.id]?.[match.id] || "";
+                            const correct = match.result && pick === match.result;
+
+                            return (
+                              <td key={match.id} className="matrix-body-cell">
+                                <div
+                                  className={`matrix-box ${
+                                    correct ? "matrix-box-correct" : ""
+                                  }`}
+                                >
+                                  <div className="matrix-pick">
+                                    {outcomeBadge(pick, match)}
+                                  </div>
+
+                                  {match.result ? (
+                                    <div className="matrix-result-line">
+                                      Result: {outcomeBadge(match.result, match)}
+                                    </div>
+                                  ) : (
+                                    <div className="matrix-result-line muted">
+                                      Result pending
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+            </div>
+          )}
+
+          {activeTab === "leaderboard" && (
+            <div className="grid-2">
+              <Panel title="Overall leaderboard">
+                <div className="toolbar-between">
+                  <div className="small-muted">
+                    Transparent ranking ready for internal sharing.
+                  </div>
+                  <button className="btn-secondary" onClick={exportLeaderboardCsv}>
+                    Export leaderboard CSV
+                  </button>
+                </div>
+
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Points</th>
+                        <th>Correct Picks</th>
+                        <th>Completion</th>
+                        <th>Champion</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {leaderboard.map((row, index) => (
+                        <tr key={row.id}>
+                          <td>{index + 1}</td>
+                          <td>
+                            <div className="table-name">{row.name}</div>
+                            <div className="table-meta">{row.email || "No email"}</div>
+                          </td>
+                          <td className="td-strong">{row.points}</td>
+                          <td>{row.hits}</td>
+                          <td>{row.completion}%</td>
+                          <td>
+                            {row.championPick}
+                            {actualChampion && row.championHit === 1 ? (
+                              <div className="tie-break-hit">tie-break hit</div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+
+              <Panel title="Tie-break and rounds">
+                <label className="label">Actual tournament champion</label>
+                <input
+                  className="input"
+                  placeholder="Enter this when the tournament ends"
+                  value={actualChampion}
+                  onChange={(e) => updateState({ actualChampion: e.target.value })}
+                />
+
+                <div className="section-top-gap">
+                  <div className="section-subtitle">Round leaders</div>
+                  <div className="stack-10">
+                    {rounds
+                      .filter((round) => round !== "All")
+                      .map((round) => (
+                        <div key={round} className="round-card">
+                          <div className="round-title">{round}</div>
+
+                          <div className="stack-8">
+                            {(standingsByRound[round] || []).slice(0, 3).map((row, index) => (
+                              <div key={row.participantId} className="round-row">
+                                <span>
+                                  #{index + 1} {row.name}
+                                </span>
+                                <strong>{row.points} pts</strong>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </Panel>
+            </div>
+          )}
+
+          {activeTab === "communications" && (
+            <div className="grid-2-wide">
+              <Panel title="Daily summary for Teams or email">
+                <div className="toolbar-wrap">
+                  <button className="btn-primary" onClick={generateAndCopySummary}>
+                    Generate and copy summary
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => setSummaryText(generateDailySummaryText())}
+                  >
+                    Generate summary only
+                  </button>
+                </div>
+
+                {summaryCopied ? (
+                  <div className="success-box">
+                    Summary copied to clipboard and ready to paste into Teams or email.
+                  </div>
+                ) : null}
+
+                <textarea
+                  className="input textarea large-textarea"
+                  value={summaryText}
+                  onChange={(e) => setSummaryText(e.target.value)}
+                  placeholder="Generate a daily summary here."
+                />
+              </Panel>
+
+              <Panel title="What is included">
+                <div className="stack-10">
+                  <div className="mini-stat">Top 5 leaderboard</div>
+                  <div className="mini-stat">Latest completed matches</div>
+                  <div className="mini-stat">Next open match</div>
+                  <div className="mini-stat">Completed match count</div>
+                  <div className="mini-stat">Total prediction entries</div>
+                </div>
+
+                <div className="section-top-gap info-box">
+                  Recommendation: post one update per day in Teams to keep engagement
+                  high throughout the tournament.
+                </div>
+              </Panel>
+            </div>
+          )}
+
+          {activeTab === "admin" && (
+            <div className="grid-2">
+              <Panel title="Competition settings">
+                <div className="stack-14">
+                  <div>
+                    <label className="label">Competition name</label>
+                    <input
+                      className="input"
+                      value={competitionName}
+                      onChange={(e) => updateState({ competitionName: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Points per correct outcome</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min="1"
+                      value={pointsPerHit}
+                      onChange={(e) =>
+                        updateState({
+                          pointsPerHit: Math.max(1, Number(e.target.value) || 1),
+                        })
+                      }
+                    />
+                  </div>
+
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={lockRegistration}
+                      onChange={(e) =>
+                        updateState({ lockRegistration: e.target.checked })
+                      }
+                    />
+                    <span>
+                      <strong>Lock registration</strong>
+                      <div className="toggle-meta">
+                        When enabled, participants can no longer be added or removed.
+                      </div>
+                    </span>
+                  </label>
+
+                  <label className="toggle-row">
+                    <input
+                      type="checkbox"
+                      checked={lockPredictions}
+                      onChange={(e) =>
+                        updateState({ lockPredictions: e.target.checked })
+                      }
+                    />
+                    <span>
+                      <strong>Lock predictions at kickoff</strong>
+                      <div className="toggle-meta">
+                        When enabled, predictions can no longer be changed after the
+                        match starts.
+                      </div>
+                    </span>
+                  </label>
+                </div>
+              </Panel>
+
+              <Panel title="Admin actions">
+                <div className="stack-14">
+                  <div className="info-box">
+                    <strong>Scoring summary</strong>
+                    <div style={{ marginTop: 8 }}>
+                      1 point for a correct outcome, 0 for an incorrect outcome.
+                      Only 1 / X / 2 predictions count, based on regular 90 minutes.
+                    </div>
+                  </div>
+
+                  <div className="info-box">
+                    <strong>Operational tips</strong>
+                    <div style={{ marginTop: 8 }}>
+                      Lock registration before the first match, import all matches
+                      upfront, and assign one admin to enter final results.
+                    </div>
+                  </div>
+
+                  <div className="toolbar-wrap">
+                    <button className="btn-secondary" onClick={exportLeaderboardCsv}>
+                      Export leaderboard CSV
+                    </button>
+                    <button className="btn-secondary" onClick={exportPredictionsCsv}>
+                      Export predictions CSV
+                    </button>
+                  </div>
+
+                  <button className="btn-reset" onClick={resetCompetition}>
+                    Reset competition
+                  </button>
+
+                  <div className="small-muted">
+                    All data is saved in localStorage, so a browser refresh should not
+                    remove your changes.
+                  </div>
+                </div>
+              </Panel>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+const css = `
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(circle at top left, rgba(59, 130, 246, 0.06), transparent 25%),
+      radial-gradient(circle at top right, rgba(16, 185, 129, 0.05), transparent 22%),
+      linear-gradient(180deg, #f6f8fb 0%, #eef3f8 100%);
+    color: #0f172a;
+    font-family: Arial, sans-serif;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .app-container {
+    max-width: 1420px;
+    margin: 0 auto;
+  }
+
+  .dashboard-hero {
+    display: grid;
+    grid-template-columns: 1.5fr 0.95fr;
+    gap: 20px;
+    background:
+      radial-gradient(circle at top right, rgba(255,255,255,0.09), transparent 28%),
+      linear-gradient(135deg, #0f172a 0%, #172554 55%, #166534 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 30px;
+    padding: 30px;
+    margin-bottom: 20px;
+    color: white;
+    box-shadow:
+      0 24px 48px rgba(15, 23, 42, 0.14),
+      0 8px 20px rgba(15, 23, 42, 0.06);
+  }
+
+  .dashboard-main {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dashboard-badge {
+    display: inline-flex;
+    width: fit-content;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.14);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .dashboard-title {
+    margin: 0;
+    font-size: 42px;
+    line-height: 1.04;
+    letter-spacing: -0.04em;
+    color: white;
+  }
+
+  .dashboard-subtitle {
+    margin: 0;
+    max-width: 760px;
+    line-height: 1.65;
+    color: rgba(255,255,255,0.84);
+    font-size: 15px;
+  }
+
+  .status-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .status-pill {
+    min-width: 190px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    backdrop-filter: blur(8px);
+    background: rgba(255,255,255,0.10);
+  }
+
+  .status-pill-label {
+    color: rgba(255,255,255,0.7);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    font-weight: 700;
+  }
+
+  .status-pill-value {
+    color: white;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .dashboard-side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-self: start;
+  }
+
+  .stat-card {
+    border-radius: 18px;
+    border: 1px solid #cbd5e1;
+    background: white;
+    padding: 14px;
+  }
+
+  .stat-card-dark {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: white;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .stat-label,
+  .stat-label-dark {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .stat-label {
+    color: #64748b;
+  }
+
+  .stat-label-dark {
+    color: rgba(255,255,255,0.72);
+  }
+
+  .stat-value {
+    margin-top: 6px;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  .top-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin-bottom: 20px;
+  }
+
+  .summary-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 22px;
+    padding: 20px;
+    box-shadow:
+      0 12px 24px rgba(15, 23, 42, 0.04),
+      inset 0 1px 0 rgba(255,255,255,0.75);
+  }
+
+  .summary-label {
+    color: #64748b;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+    font-weight: 700;
+  }
+
+  .summary-value {
+    color: #0f172a;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  .summary-value.small {
+    font-size: 20px;
+  }
+
+  .summary-meta {
+    color: #64748b;
+    margin-top: 8px;
+    line-height: 1.5;
+    font-size: 13px;
+  }
+
+  .tabs-wrap {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px;
+    background: rgba(255,255,255,0.86);
+    backdrop-filter: blur(10px);
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+  }
+
+  .tab-btn {
+    border: 1px solid transparent;
+    background: transparent;
+    color: #475569;
+    padding: 10px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.18s ease;
+  }
+
+  .tab-btn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .tab-btn-active {
+    background: #0f172a;
+    color: white;
+    border-color: #0f172a;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+  }
+
+  .panel {
+    background: rgba(255,255,255,0.96);
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    padding: 22px;
+    box-shadow:
+      0 12px 28px rgba(15, 23, 42, 0.05),
+      0 1px 3px rgba(15, 23, 42, 0.03);
+  }
+
+  .panel-title {
+    color: #0f172a;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+
+  .grid-1,
+  .grid-2,
+  .grid-2-wide,
+  .grid-3,
+  .grid-predictions {
+    display: grid;
+    gap: 16px;
+  }
+
+  .grid-1 { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-2-wide { grid-template-columns: 1.4fr 0.8fr; }
+  .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid-predictions { grid-template-columns: 320px 1fr; }
+
+  .ordered-list {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 1.8;
+  }
+
+  .rule-list,
+  .stack-8,
+  .stack-10,
+  .stack-12,
+  .stack-14 {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stack-8 { gap: 8px; }
+  .stack-10 { gap: 10px; }
+  .stack-12 { gap: 12px; }
+  .stack-14 { gap: 14px; }
+
+  .rule-list { gap: 10px; }
+
+  .rule-item,
+  .rank-card,
+  .round-card,
+  .mini-stat,
+  .list-row,
+  .match-card {
+    background: linear-gradient(180deg, #ffffff, #fafcff);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+  }
+
+  .rule-item {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 10px;
+    align-items: start;
+    border-radius: 16px;
+    padding: 12px;
+    line-height: 1.55;
+  }
+
+  .rule-index {
+    color: #64748b;
+    font-weight: 800;
+  }
+
+  .rank-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .rank-position {
+    color: #64748b;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .rank-name {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .rank-meta {
+    color: #64748b;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  .rank-points-block {
+    text-align: right;
+  }
+
+  .rank-points {
+    font-size: 28px;
+    font-weight: 800;
+  }
+
+  .form-grid-3,
+  .form-grid-2 {
+    display: grid;
+    gap: 10px;
+  }
+
+  .form-grid-3 {
+    grid-template-columns: 1fr 1fr auto;
+    align-items: center;
+  }
+
+  .form-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #d7dee7;
+    background: #fcfdff;
+    font-size: 14px;
+    outline: none;
+    font-family: Arial, sans-serif;
+    transition: all 0.18s ease;
+  }
+
+  .input:hover {
+    border-color: #c7d2de;
+  }
+
+  .input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+  }
+
+  .input-small {
+    min-width: 120px;
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  .textarea {
+    min-height: 140px;
+    resize: vertical;
+    margin-top: 10px;
+  }
+
+  .large-textarea {
+    min-height: 300px;
+    margin-top: 12px;
+  }
+
+  .label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #334155;
+  }
+
+  .list-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .list-title {
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .list-meta,
+  .small-muted,
+  .table-meta,
+  .match-kickoff,
+  .match-result-text {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-reset,
+  .btn-outcome {
+    border-radius: 14px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.18s ease;
+    font-family: Arial, sans-serif;
+  }
+
+  .btn-primary {
+    border: 1px solid #0f172a;
+    background: linear-gradient(180deg, #0f172a, #111827);
+    color: white;
+    padding: 12px 16px;
+    font-weight: 800;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.16);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    border: 1px solid #d7dee7;
+    background: white;
+    color: #334155;
+    padding: 10px 14px;
+  }
+
+  .btn-secondary:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+  }
+
+  .btn-danger,
+  .btn-reset {
+    border: 1px solid #fecdd3;
+    background: linear-gradient(180deg, #fff1f2, #ffe4e6);
+    color: #b91c1c;
+    padding: 10px 14px;
+  }
+
+  .btn-reset {
+    width: fit-content;
+    font-weight: 800;
+  }
+
+  .btn-outcome {
+    border: 1px solid #d7dee7;
+    background: white;
+    color: #0f172a;
+    padding: 10px 14px;
+    min-width: 56px;
+    font-weight: 800;
+  }
+
+  .btn-outcome:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+  }
+
+  .btn-outcome-active {
+    background: linear-gradient(180deg, #15803d, #166534);
+    border-color: #166534;
+    color: white;
+    box-shadow: 0 8px 16px rgba(22, 101, 52, 0.18);
+  }
+
+  .btn-outcome-dark-active {
+    background: linear-gradient(180deg, #0f172a, #111827);
+    border-color: #0f172a;
+    color: white;
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.16);
+  }
+
+  .btn-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .match-card {
+    border-radius: 18px;
+    padding: 16px;
+  }
+
+  .match-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .match-round {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 6px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .match-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .button-row-wrap {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .info-box,
+  .success-box {
+    border-radius: 16px;
+    padding: 14px;
+    line-height: 1.6;
+  }
+
+  .info-box {
+    background: linear-gradient(180deg, #fafcff, #f8fafc);
+    border: 1px solid #e2e8f0;
+    color: #334155;
+  }
+
+  .success-box {
+    background: linear-gradient(180deg, #f0fdf4, #ecfdf5);
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    margin-top: 12px;
+  }
+
+  .toolbar-between,
+  .toolbar-wrap {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .toolbar-between {
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .table th {
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 13px;
+    padding: 12px 10px;
+    vertical-align: top;
+    background: #fafcff;
+  }
+
+  .table td {
+    border-bottom: 1px solid #f1f5f9;
+    padding: 14px 10px;
+    vertical-align: top;
+    font-size: 14px;
+    background: white;
+  }
+
+  .table tr:hover td {
+    background: #fbfdff;
+  }
+
+  .td-strong {
+    font-size: 18px !important;
+    font-weight: 800;
+  }
+
+  .table-name {
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .section-subtitle {
+    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+
+  .section-top-gap {
+    margin-top: 24px;
+  }
+
+  .mt-12 { margin-top: 12px; }
+  .mt-10 { margin-top: 10px; }
+
+  .mini-stat {
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+
+  .round-card {
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  .round-title {
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+
+  .round-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .toggle-row {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 12px;
+    align-items: start;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  .toggle-meta {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  .badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    width: fit-content;
+    border: 1px solid transparent;
+  }
+
+  .badge-green {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
+  }
+
+  .badge-amber {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+  }
+
+  .badge-slate {
+    background: #e2e8f0;
+    color: #334155;
+    border-color: #cbd5e1;
+  }
+
+  .tie-break-hit {
+    margin-top: 6px;
+    display: inline-block;
+    background: #dcfce7;
+    color: #166534;
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .matrix-wrap {
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    background: white;
+    box-shadow:
+      0 12px 28px rgba(15, 23, 42, 0.04),
+      inset 0 1px 0 rgba(255,255,255,0.7);
+  }
+
+  .matrix-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 100%;
+    width: max-content;
+    background: white;
+  }
+
+  .matrix-table th,
+  .matrix-table td {
+    border-bottom: 1px solid #eef2f7;
+    border-right: 1px solid #eef2f7;
+    vertical-align: top;
+    padding: 0;
+    background: white;
+  }
+
+  .matrix-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .matrix-head-cell {
+    min-width: 220px;
+    padding: 14px 14px 12px;
+    background: linear-gradient(180deg, #f8fafc, #f1f5f9) !important;
+  }
+
+  .matrix-head-title {
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .matrix-head-meta {
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  .matrix-left-head {
+    min-width: 220px;
+    padding: 14px;
+    background: linear-gradient(180deg, #f8fafc, #f1f5f9) !important;
+    font-size: 13px;
+    color: #334155;
+    text-align: left;
+    font-weight: 700;
+    box-shadow: 6px 0 14px rgba(15, 23, 42, 0.04);
+  }
+
+  .matrix-participant-cell {
+    min-width: 220px;
+    padding: 14px;
+    background: linear-gradient(180deg, #fcfdff, #f8fafc) !important;
+    box-shadow: 6px 0 14px rgba(15, 23, 42, 0.03);
+  }
+
+  .matrix-participant-name {
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 4px;
+    font-size: 14px;
+  }
+
+  .matrix-participant-meta {
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .matrix-body-cell {
+    min-width: 220px;
+    padding: 12px;
+    background: white;
+  }
+
+  .matrix-box {
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 12px;
+    background: linear-gradient(180deg, #fcfdff, #f8fafc);
+    min-height: 86px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+  }
+
+  .matrix-box-correct {
+    background: linear-gradient(180deg, #ecfdf5, #dcfce7);
+    border-color: #bbf7d0;
+  }
+
+  .matrix-pick {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 6px;
+  }
+
+  .matrix-result-line {
+    font-size: 11px;
+    color: #475569;
+    line-height: 1.5;
+  }
+
+  .matrix-result-line.muted {
+    color: #94a3b8;
+  }
+
+  .sticky-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+
+  .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+  }
+
+  .matrix-left-head.sticky-col {
+    z-index: 4;
+  }
+
+  @media (max-width: 1160px) {
+    .dashboard-hero,
+    .top-summary,
+    .grid-3,
+    .grid-2,
+    .grid-2-wide,
+    .grid-predictions {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-side {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 820px) {
+    .app-shell {
+      padding: 14px;
+    }
+
+    .dashboard-hero {
+      padding: 20px;
+      border-radius: 24px;
+    }
+
+    .dashboard-title {
+      font-size: 30px;
+    }
+
+    .dashboard-side {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .top-summary {
+      grid-template-columns: 1fr;
+    }
+
+    .summary-value {
+      font-size: 24px;
+    }
+
+    .form-grid-3,
+    .form-grid-2 {
+      grid-template-columns: 1fr;
+    }
+
+    .tabs-wrap {
+      gap: 6px;
+    }
+
+    .tab-btn {
+      width: 100%;
+    }
+  }
+`;
