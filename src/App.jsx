@@ -301,40 +301,16 @@ const effectiveMatches =
       setLoadingSharedData(false);
     }
   }
-
+  
   useEffect(() => {
-    let mounted = true;
-
-    async function bootstrapAuth() {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
-
-      if (!mounted) return;
-
-      if (!error) {
-        setUser(session?.user || null);
-      }
-
-      setLoadingAuth(false);
+    if (user) {
+      loadSharedData();
+    } else {
+      setSharedSettings(null);
+      setSharedMatches([]);
+      setLoadingSharedData(false);
     }
-
-    bootstrapAuth();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-      setUser(session?.user || null);
-      setLoadingAuth(false);
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -1775,7 +1751,6 @@ completion: effectiveMatches.length
       </div>
     </>
   );
-}
 
 const css = `
   * { box-sizing: border-box; }
