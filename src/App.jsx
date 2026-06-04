@@ -614,12 +614,22 @@ export default function App() {
     }
   };
 
-  const setMatchResult = (matchId, value) => {
-    updateState({
-      matches: matches.map((match) =>
-        match.id === matchId ? { ...match, result: value } : match
-      ),
-    });
+  const setMatchResult = async (matchId, value) => {
+    try {
+      const { error } = await supabase
+        .from("matches")
+        .update({ result: value || null })
+        .eq("id", matchId);
+  
+      if (error) {
+        console.error("Failed updating match result:", error);
+        return;
+      }
+  
+      await loadSharedData();
+    } catch (err) {
+      console.error("Unexpected setMatchResult error:", err);
+    }
   };
 
   const updatePrediction = (participantId, matchId, value) => {
