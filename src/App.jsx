@@ -240,6 +240,40 @@ export default function App() {
   const effectiveMatches =
     sharedMatches.length > 0 ? sharedMatches : matches;
 
+    useEffect(() => {
+      let mounted = true;
+    
+      async function bootstrapAuth() {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+    
+        if (!mounted) return;
+    
+        if (!error) {
+          setUser(session?.user || null);
+        }
+    
+        setLoadingAuth(false);
+      }
+    
+      bootstrapAuth();
+    
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!mounted) return;
+        setUser(session?.user || null);
+        setLoadingAuth(false);
+      });
+    
+      return () => {
+        mounted = false;
+        subscription.unsubscribe();
+      };
+    }, []);
+    
   async function loadSharedData() {
     setLoadingSharedData(true);
 
