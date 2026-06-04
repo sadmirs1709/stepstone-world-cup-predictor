@@ -85,6 +85,7 @@ function loadState() {
     if (!raw) return createDefaultState();
     const parsed = JSON.parse(raw);
     const fallback = createDefaultState();
+
     return {
       ...fallback,
       ...parsed,
@@ -198,16 +199,16 @@ export default function App() {
   const [summaryText, setSummaryText] = useState("");
   const [summaryCopied, setSummaryCopied] = useState(false);
 
-// Auth state
-const [user, setUser] = useState(null);
-const [email, setEmail] = useState("");
-const [authMessage, setAuthMessage] = useState("");
-const [loadingAuth, setLoadingAuth] = useState(true);
+  // Auth state
+  const [user, setUser] = useState(null);
+  const [email, setEmail] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
-// Shared Supabase-loaded data
-const [sharedSettings, setSharedSettings] = useState(null);
-const [sharedMatches, setSharedMatches] = useState([]);
-const [loadingSharedData, setLoadingSharedData] = useState(true);
+  // Shared Supabase-loaded data
+  const [sharedSettings, setSharedSettings] = useState(null);
+  const [sharedMatches, setSharedMatches] = useState([]);
+  const [loadingSharedData, setLoadingSharedData] = useState(true);
 
   const {
     competitionName,
@@ -222,26 +223,26 @@ const [loadingSharedData, setLoadingSharedData] = useState(true);
   } = state;
 
   const effectiveCompetitionName =
-  sharedSettings?.competitionName ?? competitionName;
+    sharedSettings?.competitionName ?? competitionName;
 
-const effectiveLockRegistration =
-  sharedSettings?.lockRegistration ?? lockRegistration;
+  const effectiveLockRegistration =
+    sharedSettings?.lockRegistration ?? lockRegistration;
 
-const effectiveLockPredictions =
-  sharedSettings?.lockPredictions ?? lockPredictions;
+  const effectiveLockPredictions =
+    sharedSettings?.lockPredictions ?? lockPredictions;
 
-const effectivePointsPerHit =
-  sharedSettings?.pointsPerHit ?? pointsPerHit;
+  const effectivePointsPerHit =
+    sharedSettings?.pointsPerHit ?? pointsPerHit;
 
-const effectiveActualChampion =
-  sharedSettings?.actualChampion ?? actualChampion;
+  const effectiveActualChampion =
+    sharedSettings?.actualChampion ?? actualChampion;
 
-const effectiveMatches =
-  sharedMatches.length > 0 ? sharedMatches : matches;
+  const effectiveMatches =
+    sharedMatches.length > 0 ? sharedMatches : matches;
 
   async function loadSharedData() {
     setLoadingSharedData(true);
-  
+
     try {
       const [
         { data: settingsRow, error: settingsError },
@@ -257,15 +258,15 @@ const effectiveMatches =
           .select("*")
           .order("kickoff_at", { ascending: true }),
       ]);
-  
+
       if (settingsError && settingsError.code !== "PGRST116") {
         console.error("Failed loading competition_settings:", settingsError);
       }
-  
+
       if (matchesError) {
         console.error("Failed loading matches:", matchesError);
       }
-  
+
       if (settingsRow) {
         setSharedSettings({
           competitionName:
@@ -278,7 +279,7 @@ const effectiveMatches =
       } else {
         setSharedSettings(null);
       }
-  
+
       if (Array.isArray(matchRows)) {
         setSharedMatches(
           matchRows.map((row) => ({
@@ -301,7 +302,7 @@ const effectiveMatches =
       setLoadingSharedData(false);
     }
   }
-  
+
   useEffect(() => {
     if (user) {
       loadSharedData();
@@ -316,24 +317,14 @@ const effectiveMatches =
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  useEffect(() => {
-  if (user) {
-    loadSharedData();
-  } else {
-    setSharedSettings(null);
-    setSharedMatches([]);
-    setLoadingSharedData(false);
-  }
-}, [user]);
-
   async function sendMagicLink() {
     if (!email.trim()) {
       setAuthMessage("Please enter your work email address.");
       return;
     }
-  
+
     setAuthMessage("Sending sign-in link...");
-  
+
     try {
       const { data, error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
@@ -341,21 +332,21 @@ const effectiveMatches =
           shouldCreateUser: true,
         },
       });
-  
+
       console.log("signInWithOtp data:", data);
       console.log("signInWithOtp error:", error);
-  
+
       if (error) {
         setAuthMessage(`Supabase error: ${error.message}`);
         return;
       }
-  
+
       setAuthMessage("Check your email for the sign-in link.");
     } catch (err) {
       console.error("Unexpected auth error:", err);
       setAuthMessage(`Unexpected error: ${err?.message || "Failed to fetch"}`);
     }
-  }  
+  }
 
   async function signOutUser() {
     await supabase.auth.signOut();
@@ -373,7 +364,7 @@ const effectiveMatches =
   const filteredMatches = useMemo(() => {
     if (selectedRound === "All") return effectiveMatches;
     return effectiveMatches.filter((m) => m.round === selectedRound);
-  }, [effectiveMatches, selectedRound]);  
+  }, [effectiveMatches, selectedRound]);
 
   const isLocked = (match) => {
     if (!effectiveLockPredictions) return false;
@@ -399,21 +390,21 @@ const effectiveMatches =
 
       const championPick = championTiebreak[participant.id] || "";
       const championHit =
-      effectiveActualChampion &&
-      championPick &&
-      championPick.trim().toLowerCase() ===
-      effectiveActualChampion.trim().toLowerCase()
-        ? 1
-        : 0;
+        effectiveActualChampion &&
+        championPick &&
+        championPick.trim().toLowerCase() ===
+          effectiveActualChampion.trim().toLowerCase()
+          ? 1
+          : 0;
 
       return {
         ...participant,
         points,
         hits,
         entered,
-completion: effectiveMatches.length
-  ? Math.round((entered / effectiveMatches.length) * 100)
-  : 0,
+        completion: effectiveMatches.length
+          ? Math.round((entered / effectiveMatches.length) * 100)
+          : 0,
         championPick: championPick || "—",
         championHit,
       };
@@ -461,7 +452,8 @@ completion: effectiveMatches.length
   const completedMatches = effectiveMatches.filter((m) => m.result).length;
   const lockedMatches = effectiveMatches.filter((m) => isLocked(m)).length;
   const openMatches = effectiveMatches.length - lockedMatches;
-  const totalPredictions = participants.length * effectiveMatches.length;  
+  const totalPredictions = participants.length * effectiveMatches.length;
+
   const enteredPredictions = participants.reduce((acc, participant) => {
     return acc + Object.values(predictions[participant.id] || {}).filter(Boolean).length;
   }, 0);
@@ -469,22 +461,22 @@ completion: effectiveMatches.length
   const selectedParticipant =
     participants.find((p) => p.id === selectedParticipantId) || participants[0];
 
-    const nextOpenMatch = useMemo(() => {
-      return effectiveMatches
-        .filter((m) => !isLocked(m))
-        .sort(
-          (a, b) =>
-            (parseKickoff(a.kickoff)?.getTime() || 0) -
-            (parseKickoff(b.kickoff)?.getTime() || 0)
-        )[0];
-    }, [effectiveMatches, effectiveLockPredictions]);
+  const nextOpenMatch = useMemo(() => {
+    return effectiveMatches
+      .filter((m) => !isLocked(m))
+      .sort(
+        (a, b) =>
+          (parseKickoff(a.kickoff)?.getTime() || 0) -
+          (parseKickoff(b.kickoff)?.getTime() || 0)
+      )[0];
+  }, [effectiveMatches, effectiveLockPredictions]);
 
-    const lastSettledMatches = useMemo(() => {
-      return effectiveMatches.filter((m) => m.result).slice(-5).reverse();
-    }, [effectiveMatches]);    
+  const lastSettledMatches = useMemo(() => {
+    return effectiveMatches.filter((m) => m.result).slice(-5).reverse();
+  }, [effectiveMatches]);
 
   const addParticipant = () => {
-    if (lockRegistration) return;
+    if (effectiveLockRegistration) return;
 
     const name = newParticipant.name.trim();
     const emailValue = newParticipant.email.trim();
@@ -511,7 +503,7 @@ completion: effectiveMatches.length
   };
 
   const removeParticipant = (participantId) => {
-    if (lockRegistration) return;
+    if (effectiveLockRegistration) return;
 
     const remaining = participants.filter((p) => p.id !== participantId);
     const nextPredictions = { ...predictions };
@@ -536,12 +528,12 @@ completion: effectiveMatches.length
     const home = newMatch.home.trim();
     const away = newMatch.away.trim();
     const kickoff = newMatch.kickoff.trim();
-  
+
     if (!round || !home || !away || !kickoff) return;
-  
+
     try {
       const kickoffIso = new Date(kickoff.replace(" ", "T")).toISOString();
-  
+
       const { error } = await supabase.from("matches").insert([
         {
           round,
@@ -551,14 +543,14 @@ completion: effectiveMatches.length
           result: null,
         },
       ]);
-  
+
       if (error) {
         console.error("Failed inserting match:", error);
         return;
       }
-  
+
       await loadSharedData();
-  
+
       setNewMatch({
         round: "Group Stage",
         home: "",
@@ -568,14 +560,6 @@ completion: effectiveMatches.length
     } catch (err) {
       console.error("Unexpected addMatch error:", err);
     }
-  };  
-
-    setNewMatch({
-      round: "Group Stage",
-      home: "",
-      away: "",
-      kickoff: "",
-    });
   };
 
   const removeMatch = (matchId) => {
@@ -602,7 +586,7 @@ completion: effectiveMatches.length
   };
 
   const updatePrediction = (participantId, matchId, value) => {
-    const match = matches.find((m) => m.id === matchId);
+    const match = effectiveMatches.find((m) => m.id === matchId);
     if (match && isLocked(match)) return;
 
     updateState({
@@ -687,10 +671,10 @@ completion: effectiveMatches.length
   };
 
   const exportPredictionsCsv = () => {
-    const header = ["Participant", ...matches.map((m) => `${m.home} vs ${m.away}`)];
+    const header = ["Participant", ...effectiveMatches.map((m) => `${m.home} vs ${m.away}`)];
     const rows = participants.map((participant) => [
       participant.name,
-      ...matches.map((match) =>
+      ...effectiveMatches.map((match) =>
         outcomeBadge(predictions[participant.id]?.[match.id] || "", match)
       ),
     ]);
@@ -700,7 +684,7 @@ completion: effectiveMatches.length
 
   const generateDailySummaryText = () => {
     const lines = [];
-    lines.push(`🏆 ${competitionName} — Daily Leaderboard`);
+    lines.push(`🏆 ${effectiveCompetitionName} — Daily Leaderboard`);
     lines.push("");
 
     const ranked = leaderboard.slice(0, 5);
@@ -733,7 +717,7 @@ completion: effectiveMatches.length
       lines.push("");
     }
 
-    lines.push(`Completed matches: ${completedMatches}/${matches.length}`);
+    lines.push(`Completed matches: ${completedMatches}/${effectiveMatches.length}`);
     lines.push(`Predictions entered: ${enteredPredictions}/${totalPredictions}`);
     return lines.join("\n");
   };
@@ -832,6 +816,7 @@ completion: effectiveMatches.length
       </div>
     );
   }
+
   if (!user) {
     return (
       <div
@@ -972,18 +957,18 @@ completion: effectiveMatches.length
               </p>
 
               <div className="status-strip">
-              <StatusPill
-  label="Registration"
-  value={effectiveLockRegistration ? "Locked" : "Open"}
-/>
-<StatusPill
-  label="Predictions"
-  value={effectiveLockPredictions ? "Lock at kickoff" : "Open editing"}
-/>
-<StatusPill
-  label="Scoring"
-  value={`${effectivePointsPerHit} point per correct outcome`}
-/>
+                <StatusPill
+                  label="Registration"
+                  value={effectiveLockRegistration ? "Locked" : "Open"}
+                />
+                <StatusPill
+                  label="Predictions"
+                  value={effectiveLockPredictions ? "Lock at kickoff" : "Open editing"}
+                />
+                <StatusPill
+                  label="Scoring"
+                  value={`${effectivePointsPerHit} point per correct outcome`}
+                />
               </div>
 
               <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -996,7 +981,7 @@ completion: effectiveMatches.length
 
             <div className="dashboard-side">
               <StatCard label="Participants" value={participants.length} dark />
-              <StatCard label="Matches" value={matches.length} dark />
+              <StatCard label="Matches" value={effectiveMatches.length} dark />
               <StatCard label="Open" value={openMatches} dark />
               <StatCard label="Locked" value={lockedMatches} dark />
               <StatCard label="Completed" value={completedMatches} dark />
@@ -1032,7 +1017,7 @@ completion: effectiveMatches.length
             <div className="summary-card">
               <div className="summary-label">Competition status</div>
               <div className="summary-value small">
-                {completedMatches}/{matches.length} completed
+              {completedMatches}/{effectiveMatches.length} completed
               </div>
               <div className="summary-meta">
                 {enteredPredictions} prediction entries captured
@@ -1114,7 +1099,7 @@ completion: effectiveMatches.length
                     className="input"
                     placeholder="Participant name"
                     value={newParticipant.name}
-                    disabled={lockRegistration}
+                    disabled={effectiveLockRegistration}
                     onChange={(e) =>
                       setNewParticipant((prev) => ({ ...prev, name: e.target.value }))
                     }
@@ -1123,14 +1108,14 @@ completion: effectiveMatches.length
                     className="input"
                     placeholder="Email (optional)"
                     value={newParticipant.email}
-                    disabled={lockRegistration}
+                    disabled={effectiveLockRegistration}
                     onChange={(e) =>
                       setNewParticipant((prev) => ({ ...prev, email: e.target.value }))
                     }
                   />
                   <button
-                    className={`btn-primary ${lockRegistration ? "btn-disabled" : ""}`}
-                    disabled={lockRegistration}
+                    className={`btn-primary ${effectiveLockRegistration ? "btn-disabled" : ""}`}
+                    disabled={effectiveLockRegistration}
                     onClick={addParticipant}
                   >
                     Add
@@ -1139,8 +1124,8 @@ completion: effectiveMatches.length
 
                 <div style={{ marginTop: 12 }}>
                   <StatusBadge
-                    tone={lockRegistration ? "amber" : "green"}
-                    text={lockRegistration ? "Registration locked" : "Registration open"}
+                    tone={effectiveLockRegistration ? "amber" : "green"}
+                    text={effectiveLockRegistration ? "Registration locked" : "Registration open"}
                   />
                 </div>
               </Panel>
@@ -1154,8 +1139,8 @@ completion: effectiveMatches.length
                         <div className="list-meta">{participant.email || "No email"}</div>
                       </div>
                       <button
-                        className={`btn-danger ${lockRegistration ? "btn-disabled" : ""}`}
-                        disabled={lockRegistration}
+                        className={`btn-danger ${effectiveLockRegistration ? "btn-disabled" : ""}`}
+                        disabled={effectiveLockRegistration}
                         onClick={() => removeParticipant(participant.id)}
                       >
                         Remove
@@ -1352,9 +1337,9 @@ completion: effectiveMatches.length
                   </div>
 
                   <div className="info-box">
-                    {lockPredictions
-                      ? "Predictions are automatically locked at kickoff."
-                      : "Prediction locking is currently disabled."}
+                  {effectiveLockPredictions
+  ? "Predictions are automatically locked at kickoff."
+  : "Prediction locking is currently disabled."}
                   </div>
                 </div>
               </Panel>
@@ -1751,6 +1736,7 @@ completion: effectiveMatches.length
       </div>
     </>
   );
+}
 
 const css = `
   * { box-sizing: border-box; }
@@ -2653,4 +2639,4 @@ const css = `
       width: 100%;
     }
   }
-`;
+  `;
