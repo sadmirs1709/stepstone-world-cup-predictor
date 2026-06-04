@@ -239,6 +239,69 @@ const effectiveActualChampion =
 const effectiveMatches =
   sharedMatches.length > 0 ? sharedMatches : matches;
 
+  async function loadSharedData() {
+    setLoadingSharedData(true);
+  
+    try {
+      const [
+        { data: settingsRow, error: settingsError },
+        { data: matchRows, error: matchesError },
+      ] = await Promise.all([
+        supabase
+          .from("competition_settings")
+          .select("*")
+          .eq("id", "main")
+          .single(),
+        supabase
+          .from("matches")
+          .select("*")
+          .order("kickoff_at", { ascending: true }),
+      ]);
+  
+      if (settingsError && settingsError.code !== "PGRST116") {
+        console.error("Failed loading competition_settings:", settingsError);
+      }
+  
+      if (matchesError) {
+        console.error("Failed loading matches:", matchesError);
+      }
+  
+      if (settingsRow) {
+        setSharedSettings({
+          competitionName:
+            settingsRow.competition_name ?? "StepStone World Cup Predictor 2026",
+          lockRegistration: settingsRow.registration_locked ?? false,
+          lockPredictions: settingsRow.prediction_lock_enabled ?? true,
+          pointsPerHit: settingsRow.points_per_hit ?? 1,
+          actualChampion: settingsRow.actual_champion ?? "",
+        });
+      } else {
+        setSharedSettings(null);
+      }
+  
+      if (Array.isArray(matchRows)) {
+        setSharedMatches(
+          matchRows.map((row) => ({
+            id: row.id,
+            round: row.round,
+            home: row.home_team,
+            away: row.away_team,
+            kickoff: row.kickoff_at
+              ? new Date(row.kickoff_at).toISOString().slice(0, 16).replace("T", " ")
+              : "",
+            result: row.result ?? "",
+          }))
+        );
+      } else {
+        setSharedMatches([]);
+      }
+    } catch (err) {
+      console.error("Unexpected shared data load error:", err);
+    } finally {
+      setLoadingSharedData(false);
+    }
+  }
+
   useEffect(() => {
     let mounted = true;
 
@@ -278,88 +341,14 @@ const effectiveMatches =
   }, [state]);
 
   useEffect(() => {
-    let active = true;
-  
-    async function loadSharedData() {
-      setLoadingSharedData(true);
-  
-      try {
-        const [
-          { data: settingsRow, error: settingsError },
-          { data: matchRows, error: matchesError },
-        ] = await Promise.all([
-          supabase
-            .from("competition_settings")
-            .select("*")
-            .eq("id", "main")
-            .single(),
-          supabase
-            .from("matches")
-            .select("*")
-            .order("kickoff_at", { ascending: true }),
-        ]);
-  
-        if (!active) return;
-  
-        if (settingsError && settingsError.code !== "PGRST116") {
-          console.error("Failed loading competition_settings:", settingsError);
-        }
-  
-        if (matchesError) {
-          console.error("Failed loading matches:", matchesError);
-        }
-  
-        if (settingsRow) {
-          setSharedSettings({
-            competitionName:
-              settingsRow.competition_name ?? "StepStone World Cup Predictor 2026",
-            lockRegistration: settingsRow.registration_locked ?? false,
-            lockPredictions: settingsRow.prediction_lock_enabled ?? true,
-            pointsPerHit: settingsRow.points_per_hit ?? 1,
-            actualChampion: settingsRow.actual_champion ?? "",
-          });
-        } else {
-          setSharedSettings(null);
-        }
-  
-        if (Array.isArray(matchRows)) {
-          setSharedMatches(
-            matchRows.map((row) => ({
-              id: row.id,
-              round: row.round,
-              home: row.home_team,
-              away: row.away_team,
-              kickoff: row.kickoff_at
-                ? new Date(row.kickoff_at).toISOString().slice(0, 16).replace("T", " ")
-                : "",
-              result: row.result ?? "",
-            }))
-          );
-        } else {
-          setSharedMatches([]);
-        }
-      } catch (err) {
-        if (!active) return;
-        console.error("Unexpected shared data load error:", err);
-      } finally {
-        if (active) {
-          setLoadingSharedData(false);
-        }
-      }
-    }
-  
-    if (user) {
-      loadSharedData();
-    } else {
-      setSharedSettings(null);
-      setSharedMatches([]);
-      setLoadingSharedData(false);
-    }
-  
-    return () => {
-      active = false;
-    };
-  }, [user]);
+  if (user) {
+    loadSharedData();
+  } else {
+    setSharedSettings(null);
+    setSharedMatches([]);
+    setLoadingSharedData(false);
+  }
+}, [user]);
 
   async function sendMagicLink() {
     if (!email.trim()) {
@@ -566,29 +555,44 @@ completion: effectiveMatches.length
     }
   };
 
-  const addMatch = () => {
+  const addMatch = async () => {
     const round = newMatch.round.trim();
     const home = newMatch.home.trim();
     const away = newMatch.away.trim();
     const kickoff = newMatch.kickoff.trim();
-
+  
     if (!round || !home || !away || !kickoff) return;
-
-    const nextId = matches.length ? Math.max(...matches.map((m) => m.id)) + 1 : 1;
-
-    updateState({
-      matches: [
-        ...matches,
+  
+    try {
+      const kickoffIso = new Date(kickoff.replace(" ", "T")).toISOString();
+  
+      const { error } = await supabase.from("matches").insert([
         {
-          id: nextId,
           round,
-          home,
-          away,
-          kickoff,
-          result: "",
+          home_team: home,
+          away_team: away,
+          kickoff_at: kickoffIso,
+          result: null,
         },
-      ],
-    });
+      ]);
+  
+      if (error) {
+        console.error("Failed inserting match:", error);
+        return;
+      }
+  
+      await loadSharedData();
+  
+      setNewMatch({
+        round: "Group Stage",
+        home: "",
+        away: "",
+        kickoff: "",
+      });
+    } catch (err) {
+      console.error("Unexpected addMatch error:", err);
+    }
+  };  
 
     setNewMatch({
       round: "Group Stage",
