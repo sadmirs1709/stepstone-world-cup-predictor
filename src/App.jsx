@@ -198,11 +198,16 @@ export default function App() {
   const [summaryText, setSummaryText] = useState("");
   const [summaryCopied, setSummaryCopied] = useState(false);
 
-  // Auth state
-  const [user, setUser] = useState(null);
-  const [email, setEmail] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
-  const [loadingAuth, setLoadingAuth] = useState(true);
+// Auth state
+const [user, setUser] = useState(null);
+const [email, setEmail] = useState("");
+const [authMessage, setAuthMessage] = useState("");
+const [loadingAuth, setLoadingAuth] = useState(true);
+
+// Shared Supabase-loaded data
+const [sharedSettings, setSharedSettings] = useState(null);
+const [sharedMatches, setSharedMatches] = useState([]);
+const [loadingSharedData, setLoadingSharedData] = useState(true);
 
   const {
     competitionName,
@@ -215,6 +220,24 @@ export default function App() {
     predictions,
     championTiebreak,
   } = state;
+
+  const effectiveCompetitionName =
+  sharedSettings?.competitionName ?? competitionName;
+
+const effectiveLockRegistration =
+  sharedSettings?.lockRegistration ?? lockRegistration;
+
+const effectiveLockPredictions =
+  sharedSettings?.lockPredictions ?? lockPredictions;
+
+const effectivePointsPerHit =
+  sharedSettings?.pointsPerHit ?? pointsPerHit;
+
+const effectiveActualChampion =
+  sharedSettings?.actualChampion ?? actualChampion;
+
+const effectiveMatches =
+  sharedMatches.length > 0 ? sharedMatches : matches;
 
   useEffect(() => {
     let mounted = true;
@@ -253,6 +276,90 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  useEffect(() => {
+    let active = true;
+  
+    async function loadSharedData() {
+      setLoadingSharedData(true);
+  
+      try {
+        const [
+          { data: settingsRow, error: settingsError },
+          { data: matchRows, error: matchesError },
+        ] = await Promise.all([
+          supabase
+            .from("competition_settings")
+            .select("*")
+            .eq("id", "main")
+            .single(),
+          supabase
+            .from("matches")
+            .select("*")
+            .order("kickoff_at", { ascending: true }),
+        ]);
+  
+        if (!active) return;
+  
+        if (settingsError && settingsError.code !== "PGRST116") {
+          console.error("Failed loading competition_settings:", settingsError);
+        }
+  
+        if (matchesError) {
+          console.error("Failed loading matches:", matchesError);
+        }
+  
+        if (settingsRow) {
+          setSharedSettings({
+            competitionName:
+              settingsRow.competition_name ?? "StepStone World Cup Predictor 2026",
+            lockRegistration: settingsRow.registration_locked ?? false,
+            lockPredictions: settingsRow.prediction_lock_enabled ?? true,
+            pointsPerHit: settingsRow.points_per_hit ?? 1,
+            actualChampion: settingsRow.actual_champion ?? "",
+          });
+        } else {
+          setSharedSettings(null);
+        }
+  
+        if (Array.isArray(matchRows)) {
+          setSharedMatches(
+            matchRows.map((row) => ({
+              id: row.id,
+              round: row.round,
+              home: row.home_team,
+              away: row.away_team,
+              kickoff: row.kickoff_at
+                ? new Date(row.kickoff_at).toISOString().slice(0, 16).replace("T", " ")
+                : "",
+              result: row.result ?? "",
+            }))
+          );
+        } else {
+          setSharedMatches([]);
+        }
+      } catch (err) {
+        if (!active) return;
+        console.error("Unexpected shared data load error:", err);
+      } finally {
+        if (active) {
+          setLoadingSharedData(false);
+        }
+      }
+    }
+  
+    if (user) {
+      loadSharedData();
+    } else {
+      setSharedSettings(null);
+      setSharedMatches([]);
+      setLoadingSharedData(false);
+    }
+  
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   async function sendMagicLink() {
     if (!email.trim()) {
@@ -294,17 +401,17 @@ export default function App() {
   };
 
   const rounds = useMemo(() => {
-    const unique = Array.from(new Set(matches.map((m) => m.round)));
+    const unique = Array.from(new Set(effectiveMatches.map((m) => m.round)));
     return ["All", ...unique];
-  }, [matches]);
+  }, [effectiveMatches]);
 
   const filteredMatches = useMemo(() => {
-    if (selectedRound === "All") return matches;
-    return matches.filter((m) => m.round === selectedRound);
-  }, [matches, selectedRound]);
+    if (selectedRound === "All") return effectiveMatches;
+    return effectiveMatches.filter((m) => m.round === selectedRound);
+  }, [effectiveMatches, selectedRound]);  
 
   const isLocked = (match) => {
-    if (!lockPredictions) return false;
+    if (!effectiveLockPredictions) return false;
     const kickoffDate = parseKickoff(match.kickoff);
     if (!kickoffDate) return false;
     return new Date() >= kickoffDate;
@@ -316,32 +423,32 @@ export default function App() {
       let hits = 0;
       let entered = 0;
 
-      for (const match of matches) {
+      for (const match of effectiveMatches) {
         const pick = predictions[participant.id]?.[match.id];
         if (pick) entered += 1;
         if (pick && match.result && pick === match.result) {
-          points += pointsPerHit;
+          points += effectivePointsPerHit;
           hits += 1;
         }
       }
 
       const championPick = championTiebreak[participant.id] || "";
       const championHit =
-        actualChampion &&
-        championPick &&
-        championPick.trim().toLowerCase() ===
-          actualChampion.trim().toLowerCase()
-          ? 1
-          : 0;
+      effectiveActualChampion &&
+      championPick &&
+      championPick.trim().toLowerCase() ===
+      effectiveActualChampion.trim().toLowerCase()
+        ? 1
+        : 0;
 
       return {
         ...participant,
         points,
         hits,
         entered,
-        completion: matches.length
-          ? Math.round((entered / matches.length) * 100)
-          : 0,
+completion: effectiveMatches.length
+  ? Math.round((entered / effectiveMatches.length) * 100)
+  : 0,
         championPick: championPick || "—",
         championHit,
       };
@@ -357,11 +464,11 @@ export default function App() {
     return rows;
   }, [
     participants,
-    matches,
+    effectiveMatches,
     predictions,
     championTiebreak,
-    actualChampion,
-    pointsPerHit,
+    effectiveActualChampion,
+    effectivePointsPerHit,
   ]);
 
   const standingsByRound = useMemo(() => {
@@ -369,7 +476,7 @@ export default function App() {
     for (const round of rounds.filter((r) => r !== "All")) {
       result[round] = participants
         .map((participant) => {
-          const roundMatches = matches.filter((m) => m.round === round);
+          const roundMatches = effectiveMatches.filter((m) => m.round === round);
           const hits = roundMatches.filter(
             (m) => m.result && predictions[participant.id]?.[m.id] === m.result
           ).length;
@@ -378,18 +485,18 @@ export default function App() {
             participantId: participant.id,
             name: participant.name,
             hits,
-            points: hits * pointsPerHit,
+            points: hits * effectivePointsPerHit,
           };
         })
         .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     }
     return result;
-  }, [rounds, participants, matches, predictions, pointsPerHit]);
+  }, [rounds, participants, effectiveMatches, predictions, effectivePointsPerHit]);
 
-  const completedMatches = matches.filter((m) => m.result).length;
-  const lockedMatches = matches.filter((m) => isLocked(m)).length;
-  const openMatches = matches.length - lockedMatches;
-  const totalPredictions = participants.length * matches.length;
+  const completedMatches = effectiveMatches.filter((m) => m.result).length;
+  const lockedMatches = effectiveMatches.filter((m) => isLocked(m)).length;
+  const openMatches = effectiveMatches.length - lockedMatches;
+  const totalPredictions = participants.length * effectiveMatches.length;  
   const enteredPredictions = participants.reduce((acc, participant) => {
     return acc + Object.values(predictions[participant.id] || {}).filter(Boolean).length;
   }, 0);
@@ -397,19 +504,19 @@ export default function App() {
   const selectedParticipant =
     participants.find((p) => p.id === selectedParticipantId) || participants[0];
 
-  const nextOpenMatch = useMemo(() => {
-    return matches
-      .filter((m) => !isLocked(m))
-      .sort(
-        (a, b) =>
-          (parseKickoff(a.kickoff)?.getTime() || 0) -
-          (parseKickoff(b.kickoff)?.getTime() || 0)
-      )[0];
-  }, [matches, lockPredictions]);
+    const nextOpenMatch = useMemo(() => {
+      return effectiveMatches
+        .filter((m) => !isLocked(m))
+        .sort(
+          (a, b) =>
+            (parseKickoff(a.kickoff)?.getTime() || 0) -
+            (parseKickoff(b.kickoff)?.getTime() || 0)
+        )[0];
+    }, [effectiveMatches, effectiveLockPredictions]);
 
-  const lastSettledMatches = useMemo(() => {
-    return matches.filter((m) => m.result).slice(-5).reverse();
-  }, [matches]);
+    const lastSettledMatches = useMemo(() => {
+      return effectiveMatches.filter((m) => m.result).slice(-5).reverse();
+    }, [effectiveMatches]);    
 
   const addParticipant = () => {
     if (lockRegistration) return;
@@ -717,6 +824,34 @@ export default function App() {
     );
   }
 
+  if (user && loadingSharedData) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "#f6f8fb",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 18,
+            padding: 24,
+            minWidth: 320,
+            boxShadow: "0 12px 24px rgba(15, 23, 42, 0.06)",
+          }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 800 }}>
+            Loading competition data…
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!user) {
     return (
       <div
@@ -850,25 +985,25 @@ export default function App() {
           <section className="dashboard-hero">
             <div className="dashboard-main">
               <div className="dashboard-badge">Final Office Version</div>
-              <h1 className="dashboard-title">{competitionName}</h1>
+              <h1 className="dashboard-title">{effectiveCompetitionName}</h1>
               <p className="dashboard-subtitle">
                 Internal 1 / X / 2 office prediction tracker for tournament outcome
                 picks, leaderboard management, daily updates, and team-wide visibility.
               </p>
 
               <div className="status-strip">
-                <StatusPill
-                  label="Registration"
-                  value={lockRegistration ? "Locked" : "Open"}
-                />
-                <StatusPill
-                  label="Predictions"
-                  value={lockPredictions ? "Lock at kickoff" : "Open editing"}
-                />
-                <StatusPill
-                  label="Scoring"
-                  value={`${pointsPerHit} point per correct outcome`}
-                />
+              <StatusPill
+  label="Registration"
+  value={effectiveLockRegistration ? "Locked" : "Open"}
+/>
+<StatusPill
+  label="Predictions"
+  value={effectiveLockPredictions ? "Lock at kickoff" : "Open editing"}
+/>
+<StatusPill
+  label="Scoring"
+  value={`${effectivePointsPerHit} point per correct outcome`}
+/>
               </div>
 
               <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -1125,7 +1260,7 @@ export default function App() {
 
               <Panel title="Match list">
                 <div className="stack-12">
-                  {matches.map((match) => (
+                {effectiveMatches.map((match) => (
                     <div key={match.id} className="match-card">
                       <div className="match-header">
                         <div>
@@ -1437,9 +1572,9 @@ export default function App() {
                           <td>{row.completion}%</td>
                           <td>
                             {row.championPick}
-                            {actualChampion && row.championHit === 1 ? (
-                              <div className="tie-break-hit">tie-break hit</div>
-                            ) : null}
+                            {effectiveActualChampion && row.championHit === 1 ? (
+  <div className="tie-break-hit">tie-break hit</div>
+) : null}
                           </td>
                         </tr>
                       ))}
@@ -1453,7 +1588,7 @@ export default function App() {
                 <input
                   className="input"
                   placeholder="Enter this when the tournament ends"
-                  value={actualChampion}
+                  value={effectiveActualChampion}
                   onChange={(e) => updateState({ actualChampion: e.target.value })}
                 />
 

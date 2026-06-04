@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from "./lib/supabase";
 
-const STORAGE_KEY = "stepstone-world-cup-predictor-final";
+const STORAGE_KEY = "stepstone-world-cup-predictor-auth-enabled";
 
 const DEFAULT_PARTICIPANTS = [
   { id: 1, name: "Sadmir", email: "" },
@@ -197,6 +198,12 @@ export default function App() {
   const [summaryText, setSummaryText] = useState("");
   const [summaryCopied, setSummaryCopied] = useState(false);
 
+  // Auth state
+  const [user, setUser] = useState(null);
+  const [email, setEmail] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [loadingAuth, setLoadingAuth] = useState(true);
+
   const {
     competitionName,
     lockRegistration,
@@ -210,8 +217,77 @@ export default function App() {
   } = state;
 
   useEffect(() => {
+    let mounted = true;
+
+    async function bootstrapAuth() {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
+      if (!error) {
+        setUser(session?.user || null);
+      }
+
+      setLoadingAuth(false);
+    }
+
+    bootstrapAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      setUser(session?.user || null);
+      setLoadingAuth(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  async function sendMagicLink() {
+    if (!email.trim()) {
+      setAuthMessage("Please enter your work email address.");
+      return;
+    }
+  
+    setAuthMessage("Sending sign-in link...");
+  
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          shouldCreateUser: true,
+        },
+      });
+  
+      console.log("signInWithOtp data:", data);
+      console.log("signInWithOtp error:", error);
+  
+      if (error) {
+        setAuthMessage(`Supabase error: ${error.message}`);
+        return;
+      }
+  
+      setAuthMessage("Check your email for the sign-in link.");
+    } catch (err) {
+      console.error("Unexpected auth error:", err);
+      setAuthMessage(`Unexpected error: ${err?.message || "Failed to fetch"}`);
+    }
+  }  
+
+  async function signOutUser() {
+    await supabase.auth.signOut();
+  }
 
   const updateState = (patch) => {
     setState((prev) => ({ ...prev, ...patch }));
@@ -339,7 +415,7 @@ export default function App() {
     if (lockRegistration) return;
 
     const name = newParticipant.name.trim();
-    const email = newParticipant.email.trim();
+    const emailValue = newParticipant.email.trim();
     if (!name) return;
 
     const nextId = participants.length
@@ -347,7 +423,7 @@ export default function App() {
       : 1;
 
     updateState({
-      participants: [...participants, { id: nextId, name, email }],
+      participants: [...participants, { id: nextId, name, email: emailValue }],
       predictions: {
         ...predictions,
         [nextId]: {},
@@ -614,6 +690,157 @@ export default function App() {
     setSummaryCopied(false);
   };
 
+  if (loadingAuth) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "#f6f8fb",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 18,
+            padding: 24,
+            minWidth: 320,
+            boxShadow: "0 12px 24px rgba(15, 23, 42, 0.06)",
+          }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 800 }}>Loading…</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background:
+            "radial-gradient(circle at top left, rgba(59,130,246,0.06), transparent 25%), linear-gradient(180deg, #f6f8fb 0%, #eef3f8 100%)",
+          padding: 24,
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 460,
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 22,
+            padding: 28,
+            boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
+          }}
+        >
+          <div
+            style={{
+              display: "inline-flex",
+              padding: "6px 12px",
+              borderRadius: 999,
+              background: "#0f172a",
+              color: "white",
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              marginBottom: 16,
+            }}
+          >
+            StepStone Office Predictor
+          </div>
+
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 30,
+              lineHeight: 1.1,
+              letterSpacing: "-0.03em",
+              color: "#0f172a",
+            }}
+          >
+            Sign in to join the competition
+          </h1>
+
+          <p
+            style={{
+              color: "#475569",
+              lineHeight: 1.6,
+              marginTop: 12,
+              marginBottom: 20,
+            }}
+          >
+            Enter your work email address and we’ll send you a secure sign-in link.
+          </p>
+
+          <label
+            style={{
+              display: "block",
+              fontWeight: 700,
+              marginBottom: 8,
+              color: "#334155",
+            }}
+          >
+            Work email
+          </label>
+
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@company.com"
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 14,
+              border: "1px solid #cbd5e1",
+              marginBottom: 12,
+              fontSize: 14,
+              boxSizing: "border-box",
+            }}
+          />
+
+          <button
+            onClick={sendMagicLink}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 14,
+              background: "linear-gradient(180deg, #0f172a, #111827)",
+              color: "white",
+              border: "1px solid #0f172a",
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow: "0 10px 20px rgba(15, 23, 42, 0.16)",
+            }}
+          >
+            Send sign-in link
+          </button>
+
+          {authMessage ? (
+            <div
+              style={{
+                marginTop: 14,
+                color: "#475569",
+                lineHeight: 1.5,
+                fontSize: 14,
+              }}
+            >
+              {authMessage}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{css}</style>
@@ -642,6 +869,13 @@ export default function App() {
                   label="Scoring"
                   value={`${pointsPerHit} point per correct outcome`}
                 />
+              </div>
+
+              <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <span className="badge badge-slate">{user.email || "Signed in"}</span>
+                <button className="btn-secondary" onClick={signOutUser}>
+                  Sign out
+                </button>
               </div>
             </div>
 
