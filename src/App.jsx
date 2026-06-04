@@ -1717,16 +1717,16 @@ export default function App() {
                   <div>
                     <label className="label">Points per correct outcome</label>
                     <input
-                      className="input"
-                      type="number"
-                      min="1"
-                      value={pointsPerHit}
-                      onChange={(e) =>
-                        updateState({
-                          pointsPerHit: Math.max(1, Number(e.target.value) || 1),
-                        })
-                      }
-                    />
+  className="input"  className="input"
+  min="1"
+  value={effectivePointsPerHit}
+  onChange={async (e) => {
+    await updateCompetitionSettings({
+      points_per_hit: Math.max(1, Number(e.target.value) || 1),
+    });
+  }}
+/>
+
                   </div>
 
                   <label className="toggle-row">
