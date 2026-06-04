@@ -1746,13 +1746,15 @@ export default function App() {
                   </label>
 
                   <label className="toggle-row">
-                    <input
-                      type="checkbox"
-                      checked={lockPredictions}
-                      onChange={(e) =>
-                        updateState({ lockPredictions: e.target.checked })
-                      }
-                    />
+                  <input
+  type="checkbox"
+  checked={effectiveLockRegistration}
+  onChange={async (e) => {
+    await updateCompetitionSettings({
+      registration_locked: e.target.checked,
+    });
+  }}
+/>
                     <span>
                       <strong>Lock predictions at kickoff</strong>
                       <div className="toggle-meta">
