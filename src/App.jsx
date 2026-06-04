@@ -1750,10 +1750,10 @@ export default function App() {
                   <label className="toggle-row">
                   <input
   type="checkbox"
-  checked={effectiveLockRegistration}
+  checked={effectiveLockPredictions}
   onChange={async (e) => {
     await updateCompetitionSettings({
-      registration_locked: e.target.checked,
+      prediction_lock_enabled: e.target.checked,
     });
   }}
 />
