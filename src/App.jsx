@@ -337,6 +337,26 @@ export default function App() {
     }
   }
 
+  async function updateCompetitionSettings(patch) {
+    try {
+      const { error } = await supabase
+        .from("competition_settings")
+        .update(patch)
+        .eq("id", "main");
+  
+      if (error) {
+        console.error("Failed updating competition_settings:", error);
+        return false;
+      }
+  
+      await loadSharedData();
+      return true;
+    } catch (err) {
+      console.error("Unexpected updateCompetitionSettings error:", err);
+      return false;
+    }
+  }
+
   useEffect(() => {
     if (user) {
       loadSharedData();
@@ -1683,11 +1703,15 @@ export default function App() {
                 <div className="stack-14">
                   <div>
                     <label className="label">Competition name</label>
-                    <input
-                      className="input"
-                      value={competitionName}
-                      onChange={(e) => updateState({ competitionName: e.target.value })}
-                    />
+<input
+  className="input"
+  value={effectiveCompetitionName}
+  onChange={async (e) => {
+    await updateCompetitionSettings({
+      competition_name: e.target.value,
+    });
+  }}
+/>
                   </div>
 
                   <div>
