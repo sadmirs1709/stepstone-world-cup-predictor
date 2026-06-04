@@ -1618,11 +1618,15 @@ export default function App() {
               <Panel title="Tie-break and rounds">
                 <label className="label">Actual tournament champion</label>
                 <input
-                  className="input"
-                  placeholder="Enter this when the tournament ends"
-                  value={effectiveActualChampion}
-                  onChange={(e) => updateState({ actualChampion: e.target.value })}
-                />
+  className="input"
+  placeholder="Enter this when the tournament ends"
+  value={effectiveActualChampion}
+  onChange={async (e) => {
+    await updateCompetitionSettings({
+      actual_champion: e.target.value,
+    });
+  }}
+/>
 
                 <div className="section-top-gap">
                   <div className="section-subtitle">Round leaders</div>
