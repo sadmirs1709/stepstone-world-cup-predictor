@@ -596,19 +596,22 @@ export default function App() {
     }
   };
 
-  const removeMatch = (matchId) => {
-    const nextMatches = matches.filter((m) => m.id !== matchId);
-    const nextPredictions = {};
-
-    for (const participantId of Object.keys(predictions)) {
-      nextPredictions[participantId] = { ...predictions[participantId] };
-      delete nextPredictions[participantId][matchId];
+  const removeMatch = async (matchId) => {
+    try {
+      const { error } = await supabase
+        .from("matches")
+        .delete()
+        .eq("id", matchId);
+  
+      if (error) {
+        console.error("Failed deleting match:", error);
+        return;
+      }
+  
+      await loadSharedData();
+    } catch (err) {
+      console.error("Unexpected removeMatch error:", err);
     }
-
-    updateState({
-      matches: nextMatches,
-      predictions: nextPredictions,
-    });
   };
 
   const setMatchResult = (matchId, value) => {
