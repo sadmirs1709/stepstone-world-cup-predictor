@@ -442,6 +442,50 @@ const effectiveChampionPick =
     }
   }
 
+  async function updateCurrentUserChampionPick(value) {
+    if (!user?.id) return;
+  
+    try {
+      const champion = value.trim();
+  
+      if (!champion) {
+        const { error } = await supabase
+          .from("champion_picks")
+          .delete()
+          .eq("user_id", user.id);
+  
+        if (error) {
+          console.error("Failed deleting champion pick:", error);
+          return;
+        }
+  
+        await loadCurrentUserPredictionData();
+        return;
+      }
+  
+      const { error } = await supabase
+        .from("champion_picks")
+        .upsert(
+          {
+            user_id: user.id,
+            champion,
+          },
+          {
+            onConflict: "user_id",
+          }
+        );
+  
+      if (error) {
+        console.error("Failed updating champion pick:", error);
+        return;
+      }
+  
+      await loadCurrentUserPredictionData();
+    } catch (err) {
+      console.error("Unexpected updateCurrentUserChampionPick error:", err);
+    }
+  }
+
   async function loadSharedProfiles() {
     setLoadingProfilesList(true);
   
@@ -1618,9 +1662,9 @@ const effectiveChampionPick =
                       className="input"
                       placeholder="e.g. Brazil"
                       value={effectiveChampionPick}
-                      onChange={(e) =>
-                        updateChampionTiebreak(selectedParticipantId, e.target.value)
-                      }
+                      onChange={async (e) => {
+  await updateCurrentUserChampionPick(e.target.value);
+}}
                     />
                   </div>
 
