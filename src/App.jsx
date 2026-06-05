@@ -219,6 +219,10 @@ const [loadingPredictions, setLoadingPredictions] = useState(true);
 const [sharedProfiles, setSharedProfiles] = useState([]);
 const [loadingProfilesList, setLoadingProfilesList] = useState(true);
 
+const [allSharedPredictions, setAllSharedPredictions] = useState({});
+const [allSharedChampionPicks, setAllSharedChampionPicks] = useState({});
+const [loadingAllSharedData, setLoadingAllSharedData] = useState(true);
+
   const {
     competitionName,
     lockRegistration,
@@ -261,6 +265,16 @@ const effectiveChampionPick =
 
   const effectiveParticipants =
   sharedProfiles.length > 0 ? sharedProfiles : participants;
+
+  const effectiveAllPredictions =
+  Object.keys(allSharedPredictions).length > 0
+    ? allSharedPredictions
+    : predictions;
+
+const effectiveAllChampionPicks =
+  Object.keys(allSharedChampionPicks).length > 0
+    ? allSharedChampionPicks
+    : championTiebreak;
 
     useEffect(() => {
       let mounted = true;
@@ -517,6 +531,59 @@ const effectiveChampionPick =
     }
   }
 
+  async function loadAllSharedPredictionData() {
+    setLoadingAllSharedData(true);
+  
+    try {
+      const [
+        { data: predictionRows, error: predictionsError },
+        { data: championRows, error: championError },
+      ] = await Promise.all([
+        supabase
+          .from("predictions")
+          .select("*"),
+        supabase
+          .from("champion_picks")
+          .select("*"),
+      ]);
+  
+      if (predictionsError) {
+        console.error("Failed loading all shared predictions:", predictionsError);
+        setAllSharedPredictions({});
+      } else {
+        const mappedPredictions = {};
+        for (const row of predictionRows || []) {
+          const userId = String(row.user_id);
+          const matchId = String(row.match_id);
+  
+          if (!mappedPredictions[userId]) {
+            mappedPredictions[userId] = {};
+          }
+  
+          mappedPredictions[userId][matchId] = row.prediction;
+        }
+        setAllSharedPredictions(mappedPredictions);
+      }
+  
+      if (championError) {
+        console.error("Failed loading all shared champion picks:", championError);
+        setAllSharedChampionPicks({});
+      } else {
+        const mappedChampionPicks = {};
+        for (const row of championRows || []) {
+          mappedChampionPicks[String(row.user_id)] = row.champion;
+        }
+        setAllSharedChampionPicks(mappedChampionPicks);
+      }
+    } catch (err) {
+      console.error("Unexpected loadAllSharedPredictionData error:", err);
+      setAllSharedPredictions({});
+      setAllSharedChampionPicks({});
+    } finally {
+      setLoadingAllSharedData(false);
+    }
+  }
+
   async function updateCompetitionSettings(patch) {
     try {
       const { error } = await supabase
@@ -588,6 +655,16 @@ const effectiveChampionPick =
   }, [effectiveParticipants, selectedParticipantId]);
 
   useEffect(() => {
+    if (user) {
+      loadAllSharedPredictionData();
+    } else {
+      setAllSharedPredictions({});
+      setAllSharedChampionPicks({});
+      setLoadingAllSharedData(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
@@ -654,7 +731,7 @@ const effectiveChampionPick =
       let entered = 0;
 
       for (const match of effectiveMatches) {
-        const pick = predictions[participant.id]?.[match.id];
+        const pick = effectiveAllPredictions[String(participant.id)]?.[String(match.id)];
         if (pick) entered += 1;
         if (pick && match.result && pick === match.result) {
           points += effectivePointsPerHit;
@@ -662,7 +739,7 @@ const effectiveChampionPick =
         }
       }
 
-      const championPick = championTiebreak[participant.id] || "";
+      const championPick = effectiveAllChampionPicks[String(participant.id)] || "";
       const championHit =
         effectiveActualChampion &&
         championPick &&
@@ -695,8 +772,8 @@ const effectiveChampionPick =
   }, [
     effectiveParticipants,
     effectiveMatches,
-    predictions,
-    championTiebreak,
+    effectiveAllPredictions,
+    effectiveAllChampionPicks,
     effectiveActualChampion,
     effectivePointsPerHit,
   ]);
@@ -708,7 +785,9 @@ const effectiveChampionPick =
         .map((participant) => {
           const roundMatches = effectiveMatches.filter((m) => m.round === round);
           const hits = roundMatches.filter(
-            (m) => m.result && predictions[participant.id]?.[m.id] === m.result
+            (m) =>
+              m.result &&
+              effectiveAllPredictions[String(participant.id)]?.[String(m.id)] === m.result
           ).length;
 
           return {
@@ -721,7 +800,7 @@ const effectiveChampionPick =
         .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     }
     return result;
-  }, [rounds, effectiveParticipants, effectiveMatches, predictions, effectivePointsPerHit]);
+  }, [rounds, effectiveParticipants, effectiveMatches, effectiveAllPredictions, effectivePointsPerHit]);
 
   const completedMatches = effectiveMatches.filter((m) => m.result).length;
   const lockedMatches = effectiveMatches.filter((m) => isLocked(m)).length;
@@ -1795,7 +1874,8 @@ const effectiveChampionPick =
                           </td>
 
                           {filteredMatches.map((match) => {
-                            const pick = predictions[participant.id]?.[match.id] || "";
+                            const pick =
+                            effectiveAllPredictions[String(participant.id)]?.[String(match.id)] || "";
                             const correct = match.result && pick === match.result;
 
                             return (
