@@ -1504,58 +1504,36 @@ const effectiveAllChampionPicks =
 
           {activeTab === "participants" && (
             <div className="grid-2">
-              <Panel title="Add participant">
-                <div className="form-grid-3">
-                  <input
-                    className="input"
-                    placeholder="Participant name"
-                    value={newParticipant.name}
-                    disabled={effectiveLockRegistration}
-                    onChange={(e) =>
-                      setNewParticipant((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                  />
-                  <input
-                    className="input"
-                    placeholder="Email (optional)"
-                    value={newParticipant.email}
-                    disabled={effectiveLockRegistration}
-                    onChange={(e) =>
-                      setNewParticipant((prev) => ({ ...prev, email: e.target.value }))
-                    }
-                  />
-                  <button
-                    className={`btn-primary ${effectiveLockRegistration ? "btn-disabled" : ""}`}
-                    disabled={effectiveLockRegistration}
-                    onClick={addParticipant}
-                  >
-                    Add
-                  </button>
-                </div>
+              <Panel title="Participants">
+  <div className="info-box">
+    <strong>Shared participant list</strong>
+    <div style={{ marginTop: 8 }}>
+      Participants are now created automatically when they log in to the app.
+      This list shows the real shared profile records from Supabase.
+    </div>
+  </div>
 
-                <div style={{ marginTop: 12 }}>
-                  <StatusBadge
-                    tone={effectiveLockRegistration ? "amber" : "green"}
-                    text={effectiveLockRegistration ? "Registration locked" : "Registration open"}
-                  />
-                </div>
-              </Panel>
+  <div className="section-top-gap">
+    <StatusBadge
+      tone={effectiveLockRegistration ? "amber" : "green"}
+      text={effectiveLockRegistration ? "Registration locked" : "Registration open"}
+    />
+  </div>
+</Panel>
 
               <Panel title="Participant list">
                 <div className="stack-10">
-                  {participants.map((participant) => (
+                {effectiveParticipants.map((participant) => (
                     <div key={participant.id} className="list-row">
                       <div>
                         <div className="list-title">{participant.name}</div>
                         <div className="list-meta">{participant.email || "No email"}</div>
                       </div>
-                      <button
-                        className={`btn-danger ${effectiveLockRegistration ? "btn-disabled" : ""}`}
-                        disabled={effectiveLockRegistration}
-                        onClick={() => removeParticipant(participant.id)}
-                      >
-                        Remove
-                      </button>
+
+                      <StatusBadge
+  tone={participant.role === "admin" ? "slate" : "green"}
+  text={participant.role === "admin" ? "Admin" : "Participant"}
+/>
                     </div>
                   ))}
                 </div>
