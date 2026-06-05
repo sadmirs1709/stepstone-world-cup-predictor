@@ -185,7 +185,7 @@ export default function App() {
   const [state, setState] = useState(loadState);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedParticipantId, setSelectedParticipantId] = useState(
-    () => loadState().participants?.[0]?.id || 1
+    () => String(loadState().participants?.[0]?.id || 1)
   );
   const [selectedRound, setSelectedRound] = useState("All");
   const [newParticipant, setNewParticipant] = useState({ name: "", email: "" });
@@ -209,6 +209,15 @@ export default function App() {
   const [sharedSettings, setSharedSettings] = useState(null);
   const [sharedMatches, setSharedMatches] = useState([]);
   const [loadingSharedData, setLoadingSharedData] = useState(true);
+  const [currentProfile, setCurrentProfile] = useState(null);
+const [loadingProfile, setLoadingProfile] = useState(true);
+
+const [sharedPredictions, setSharedPredictions] = useState({});
+const [sharedChampionPick, setSharedChampionPick] = useState("");
+const [loadingPredictions, setLoadingPredictions] = useState(true);
+
+const [sharedProfiles, setSharedProfiles] = useState([]);
+const [loadingProfilesList, setLoadingProfilesList] = useState(true);
 
   const {
     competitionName,
@@ -239,6 +248,17 @@ export default function App() {
 
   const effectiveMatches =
     sharedMatches.length > 0 ? sharedMatches : matches;
+
+    const effectivePredictions =
+    Object.keys(sharedPredictions).length > 0 && currentProfile?.id
+      ? { [currentProfile.id]: sharedPredictions }
+      : predictions;
+
+const effectiveChampionPick =
+  sharedChampionPick || championTiebreak[selectedParticipantId] || "";
+
+  const effectiveParticipants =
+  sharedProfiles.length > 0 ? sharedProfiles : participants;
 
     useEffect(() => {
       let mounted = true;
@@ -337,6 +357,120 @@ export default function App() {
     }
   }
 
+  async function loadCurrentProfile() {
+    if (!user?.id) {
+      setCurrentProfile(null);
+      setLoadingProfile(false);
+      return;
+    }
+  
+    setLoadingProfile(true);
+  
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+  
+      if (error) {
+        console.error("Failed loading current profile:", error);
+        setCurrentProfile(null);
+        return;
+      }
+  
+      setCurrentProfile(data || null);
+    } catch (err) {
+      console.error("Unexpected loadCurrentProfile error:", err);
+      setCurrentProfile(null);
+    } finally {
+      setLoadingProfile(false);
+    }
+  }
+  
+  async function loadCurrentUserPredictionData() {
+    if (!user?.id) {
+      setSharedPredictions({});
+      setSharedChampionPick("");
+      setLoadingPredictions(false);
+      return;
+    }
+  
+    setLoadingPredictions(true);
+  
+    try {
+      const [
+        { data: predictionRows, error: predictionsError },
+        { data: championRow, error: championError },
+      ] = await Promise.all([
+        supabase
+          .from("predictions")
+          .select("*")
+          .eq("user_id", user.id),
+        supabase
+          .from("champion_picks")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
+  
+      if (predictionsError) {
+        console.error("Failed loading current user predictions:", predictionsError);
+        setSharedPredictions({});
+      } else {
+        const mapped = {};
+        for (const row of predictionRows || []) {
+          mapped[row.match_id] = row.prediction;
+        }
+        setSharedPredictions(mapped);
+      }
+  
+      if (championError && championError.code !== "PGRST116") {
+        console.error("Failed loading current user champion pick:", championError);
+        setSharedChampionPick("");
+      } else {
+        setSharedChampionPick(championRow?.champion ?? "");
+      }
+    } catch (err) {
+      console.error("Unexpected loadCurrentUserPredictionData error:", err);
+      setSharedPredictions({});
+      setSharedChampionPick("");
+    } finally {
+      setLoadingPredictions(false);
+    }
+  }
+
+  async function loadSharedProfiles() {
+    setLoadingProfilesList(true);
+  
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("display_name", { ascending: true });
+  
+      if (error) {
+        console.error("Failed loading shared profiles:", error);
+        setSharedProfiles([]);
+        return;
+      }
+  
+      const mapped = (data || []).map((row) => ({
+        id: row.id,
+        name: row.display_name || row.email || "Unknown participant",
+        email: row.email || "",
+        role: row.role || "participant",
+      }));
+  
+      setSharedProfiles(mapped);
+    } catch (err) {
+      console.error("Unexpected loadSharedProfiles error:", err);
+      setSharedProfiles([]);
+    } finally {
+      setLoadingProfilesList(false);
+    }
+  }
+
   async function updateCompetitionSettings(patch) {
     try {
       const { error } = await supabase
@@ -366,6 +500,46 @@ export default function App() {
       setLoadingSharedData(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      loadCurrentProfile();
+    } else {
+      setCurrentProfile(null);
+      setLoadingProfile(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      loadCurrentUserPredictionData();
+    } else {
+      setSharedPredictions({});
+      setSharedChampionPick("");
+      setLoadingPredictions(false);
+    }
+  }, [user]);
+  
+  useEffect(() => {
+    if (user) {
+      loadSharedProfiles();
+    } else {
+      setSharedProfiles([]);
+      setLoadingProfilesList(false);
+    }
+  }, [user]);
+  
+  useEffect(() => {
+    if (!effectiveParticipants.length) return;
+  
+    const exists = effectiveParticipants.some(
+      (participant) => String(participant.id) === String(selectedParticipantId)
+    );
+  
+    if (!exists) {
+      setSelectedParticipantId(String(effectiveParticipants[0].id));
+    }
+  }, [effectiveParticipants, selectedParticipantId]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -428,7 +602,7 @@ export default function App() {
   };
 
   const leaderboard = useMemo(() => {
-    const rows = participants.map((participant) => {
+    const rows = effectiveParticipants.map((participant) => {
       let points = 0;
       let hits = 0;
       let entered = 0;
@@ -473,7 +647,7 @@ export default function App() {
 
     return rows;
   }, [
-    participants,
+    effectiveParticipants,
     effectiveMatches,
     predictions,
     championTiebreak,
@@ -484,7 +658,7 @@ export default function App() {
   const standingsByRound = useMemo(() => {
     const result = {};
     for (const round of rounds.filter((r) => r !== "All")) {
-      result[round] = participants
+      result[round] = effectiveParticipants
         .map((participant) => {
           const roundMatches = effectiveMatches.filter((m) => m.round === round);
           const hits = roundMatches.filter(
@@ -501,7 +675,7 @@ export default function App() {
         .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     }
     return result;
-  }, [rounds, participants, effectiveMatches, predictions, effectivePointsPerHit]);
+  }, [rounds, effectiveParticipants, effectiveMatches, predictions, effectivePointsPerHit]);
 
   const completedMatches = effectiveMatches.filter((m) => m.result).length;
   const lockedMatches = effectiveMatches.filter((m) => isLocked(m)).length;
@@ -513,7 +687,8 @@ export default function App() {
   }, 0);
 
   const selectedParticipant =
-    participants.find((p) => p.id === selectedParticipantId) || participants[0];
+  effectiveParticipants.find((p) => p.id === selectedParticipantId) ||
+  effectiveParticipants[0];
 
   const nextOpenMatch = useMemo(() => {
     return effectiveMatches
@@ -652,19 +827,34 @@ export default function App() {
     }
   };
 
-  const updatePrediction = (participantId, matchId, value) => {
-    const match = effectiveMatches.find((m) => m.id === matchId);
+  const updatePrediction = async (_participantId, matchId, value) => {
+    const match = effectiveMatches.find((m) => String(m.id) === String(matchId));
     if (match && isLocked(match)) return;
-
-    updateState({
-      predictions: {
-        ...predictions,
-        [participantId]: {
-          ...(predictions[participantId] || {}),
-          [matchId]: value,
-        },
-      },
-    });
+    if (!user?.id) return;
+  
+    try {
+      const { error } = await supabase
+        .from("predictions")
+        .upsert(
+          {
+            user_id: user.id,
+            match_id: matchId,
+            prediction: value,
+          },
+          {
+            onConflict: "user_id,match_id",
+          }
+        );
+  
+      if (error) {
+        console.error("Failed updating prediction:", error);
+        return;
+      }
+  
+      await loadCurrentUserPredictionData();
+    } catch (err) {
+      console.error("Unexpected updatePrediction error:", err);
+    }
   };
 
   const updateChampionTiebreak = (participantId, value) => {
@@ -884,6 +1074,35 @@ export default function App() {
     );
   }
 
+  if (user && loadingProfile) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "#f6f8fb",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 18,
+            padding: 24,
+            minWidth: 320,
+            boxShadow: "0 12px 24px rgba(15, 23, 42, 0.06)",
+          }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 800 }}>
+            Loading profile…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div
@@ -1047,7 +1266,7 @@ export default function App() {
             </div>
 
             <div className="dashboard-side">
-              <StatCard label="Participants" value={participants.length} dark />
+            <StatCard label="Participants" value={effectiveParticipants.length} dark />
               <StatCard label="Matches" value={effectiveMatches.length} dark />
               <StatCard label="Open" value={openMatches} dark />
               <StatCard label="Locked" value={lockedMatches} dark />
@@ -1366,9 +1585,9 @@ export default function App() {
                     <select
                       className="input"
                       value={selectedParticipantId}
-                      onChange={(e) => setSelectedParticipantId(Number(e.target.value))}
+                      onChange={(e) => setSelectedParticipantId(e.target.value)}
                     >
-                      {participants.map((participant) => (
+                      {effectiveParticipants.map((participant) => (
                         <option key={participant.id} value={participant.id}>
                           {participant.name}
                         </option>
@@ -1396,7 +1615,7 @@ export default function App() {
                     <input
                       className="input"
                       placeholder="e.g. Brazil"
-                      value={championTiebreak[selectedParticipantId] || ""}
+                      value={effectiveChampionPick}
                       onChange={(e) =>
                         updateChampionTiebreak(selectedParticipantId, e.target.value)
                       }
@@ -1415,7 +1634,7 @@ export default function App() {
                 <div className="stack-12">
                   {filteredMatches.map((match) => {
                     const currentPick =
-                      predictions[selectedParticipantId]?.[match.id] || "";
+                    effectivePredictions[selectedParticipantId]?.[match.id] || "";
                     const locked = isLocked(match);
 
                     return (
@@ -1518,7 +1737,7 @@ export default function App() {
                     </thead>
 
                     <tbody>
-                      {participants.map((participant) => (
+                    {effectiveParticipants.map((participant) => (
                         <tr key={participant.id}>
                           <td className="sticky-col matrix-participant-cell">
                             <div className="matrix-participant-name">
