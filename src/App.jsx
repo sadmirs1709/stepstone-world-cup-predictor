@@ -250,8 +250,10 @@ const [loadingProfilesList, setLoadingProfilesList] = useState(true);
     sharedMatches.length > 0 ? sharedMatches : matches;
 
     const effectivePredictions =
-    Object.keys(sharedPredictions).length > 0 && currentProfile?.id
-      ? { [currentProfile.id]: sharedPredictions }
+    Object.keys(sharedPredictions).length > 0
+      ? {
+          [String(selectedParticipantId)]: sharedPredictions,
+        }
       : predictions;
 
 const effectiveChampionPick =
