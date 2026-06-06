@@ -832,12 +832,22 @@ const currentParticipantId =
   }, [rounds, competitionParticipants, effectiveMatches, effectiveAllPredictions, effectivePointsPerHit]);
 
   const completedMatches = effectiveMatches.filter((m) => m.result).length;
-  const lockedMatches = effectiveMatches.filter((m) => isLocked(m)).length;
-  const openMatches = effectiveMatches.length - lockedMatches;
-  const totalPredictions = competitionParticipants.length * effectiveMatches.length;
+  const lockedMatches = effectiveMatches.filter(
+    (m) => !m.result && isLocked(m)
+  ).length;
+  const openMatches = effectiveMatches.filter(
+    (m) => !m.result && !isLocked(m)
+  ).length;
+  const totalPredictions =
+  competitionParticipants.length * effectiveMatches.length;
 
-  const enteredPredictions = participants.reduce((acc, participant) => {
-    return acc + Object.values(predictions[participant.id] || {}).filter(Boolean).length;
+  const enteredPredictions = competitionParticipants.reduce((acc, participant) => {
+    return (
+      acc +
+      Object.values(
+        effectiveAllPredictions[String(participant.id)] || {}
+      ).filter(Boolean).length
+    );
   }, 0);
 
   const selectedParticipant =
