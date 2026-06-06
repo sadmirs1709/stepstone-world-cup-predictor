@@ -284,16 +284,20 @@ const competitionParticipants =
 const currentParticipantId =
   !isAdmin && currentProfile?.id ? String(currentProfile.id) : "";
 
-    const visibleTabs = [
-      ["overview", "Overview"],
-      ["participants", "Participants"],
-      ["matches", "Matches"],
-      ["predictions", "Predictions"],
-      ["matrix", "Matrix"],
-      ["leaderboard", "Leaderboard"],
-      ["communications", "Communications"],
-      ...(currentProfile?.role === "admin" ? [["admin", "Admin"]] : []),
-    ];
+  const visibleTabs = [
+    ["overview", "Overview"],
+    ["participants", "Participants"],
+    ["matches", "Matches"],
+    ["predictions", "Predictions"],
+    ["matrix", "Matrix"],
+    ["leaderboard", "Leaderboard"],
+    ...(isAdmin
+      ? [
+          ["communications", "Communications"],
+          ["admin", "Admin"],
+        ]
+      : []),
+  ];
 
     useEffect(() => {
       let mounted = true;
@@ -1475,15 +1479,17 @@ const currentParticipantId =
 
           {activeTab === "overview" && (
             <div className="grid-3">
-              <Panel title="How it works">
-                <ol className="ordered-list">
-                  <li>Add participants or keep the placeholders for now.</li>
-                  <li>Add matches manually or import them in bulk.</li>
-                  <li>Each participant predicts only 1 / X / 2.</li>
-                  <li>Enter the actual result after the match ends.</li>
-                  <li>The leaderboard updates automatically.</li>
-                </ol>
-              </Panel>
+              {isAdmin ? (
+  <Panel title="How it works">
+    <ol className="ordered-list">
+      <li>Add participants or keep the placeholders for now.</li>
+      <li>Add matches manually or import them in bulk.</li>
+      <li>Each participant predicts only 1 / X / 2.</li>
+      <li>Enter the actual result after the match ends.</li>
+      <li>The leaderboard updates automatically.</li>
+    </ol>
+  </Panel>
+) : null}
 
               <Panel title="Official rules">
                 <div className="rule-list">
@@ -1974,7 +1980,9 @@ const currentParticipantId =
   className="input"
   placeholder="Enter this when the tournament ends"
   value={effectiveActualChampion}
+  disabled={!isAdmin}
   onChange={async (e) => {
+    if (!isAdmin) return;
     await updateCompetitionSettings({
       actual_champion: e.target.value,
     });
