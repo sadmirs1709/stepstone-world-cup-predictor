@@ -276,6 +276,17 @@ const effectiveAllChampionPicks =
     ? allSharedChampionPicks
     : championTiebreak;
 
+    const visibleTabs = [
+      ["overview", "Overview"],
+      ["participants", "Participants"],
+      ["matches", "Matches"],
+      ["predictions", "Predictions"],
+      ["matrix", "Matrix"],
+      ["leaderboard", "Leaderboard"],
+      ["communications", "Communications"],
+      ...(currentProfile?.role === "admin" ? [["admin", "Admin"]] : []),
+    ];
+
     useEffect(() => {
       let mounted = true;
     
@@ -1437,25 +1448,16 @@ const effectiveAllChampionPicks =
           </section>
 
           <section className="tabs-wrap">
-            {[
-              ["overview", "Overview"],
-              ["participants", "Participants"],
-              ["matches", "Matches"],
-              ["predictions", "Predictions"],
-              ["matrix", "Matrix"],
-              ["leaderboard", "Leaderboard"],
-              ["communications", "Communications"],
-              ["admin", "Admin"],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                className={`tab-btn ${activeTab === key ? "tab-btn-active" : ""}`}
-                onClick={() => setActiveTab(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </section>
+  {visibleTabs.map(([key, label]) => (
+    <button
+      key={key}
+      className={`tab-btn ${activeTab === key ? "tab-btn-active" : ""}`}
+      onClick={() => setActiveTab(key)}
+    >
+      {label}
+    </button>
+  ))}
+</section>
 
           {activeTab === "overview" && (
             <div className="grid-3">
