@@ -684,6 +684,12 @@ const currentParticipantId =
   }, [user]);
 
   useEffect(() => {
+    if (!isAdmin && currentParticipantId) {
+      setSelectedParticipantId(currentParticipantId);
+    }
+  }, [isAdmin, currentParticipantId]);
+
+  useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
@@ -1552,7 +1558,8 @@ const currentParticipantId =
           )}
 
           {activeTab === "matches" && (
-            <div className="grid-2">
+            <div className={isAdmin ? "grid-2" : "grid-1"}>
+              {isAdmin ? (
               <Panel title="Add match">
                 <div className="form-grid-2">
                   <select
@@ -1621,6 +1628,7 @@ const currentParticipantId =
                   </button>
                 </div>
               </Panel>
+              ) : null}
 
               <Panel title="Match list">
                 <div className="stack-12">
@@ -1640,44 +1648,45 @@ const currentParticipantId =
                             tone={isLocked(match) ? "slate" : "green"}
                             text={isLocked(match) ? "Locked" : "Open"}
                           />
-                          <button className="btn-danger" onClick={() => removeMatch(match.id)}>
-                            Delete
-                          </button>
+{isAdmin ? (
+  <button className="btn-danger" onClick={() => removeMatch(match.id)}>
+    Delete
+  </button>
+) : null}
                         </div>
                       </div>
 
-                      <div className="button-row-wrap">
-                        <button
-                          className={`btn-outcome ${
-                            match.result === "1" ? "btn-outcome-active" : ""
-                          }`}
-                          onClick={() => setMatchResult(match.id, "1")}
-                        >
-                          {match.home}
-                        </button>
-
-                        <button
-                          className={`btn-outcome ${
-                            match.result === "X" ? "btn-outcome-active" : ""
-                          }`}
-                          onClick={() => setMatchResult(match.id, "X")}
-                        >
-                          X
-                        </button>
-
-                        <button
-                          className={`btn-outcome ${
-                            match.result === "2" ? "btn-outcome-active" : ""
-                          }`}
-                          onClick={() => setMatchResult(match.id, "2")}
-                        >
-                          {match.away}
-                        </button>
-
-                        <button className="btn-secondary" onClick={() => setMatchResult(match.id, "")}>
-                          Reset
-                        </button>
-                      </div>
+                      {isAdmin ? (
+  <div className="button-row-wrap">
+    <button
+      className={`btn-outcome ${
+        match.result === "1" ? "btn-outcome-active" : ""
+      }`}
+      onClick={() => setMatchResult(match.id, "1")}
+    >
+      {match.home}
+    </button>
+    <button
+      className={`btn-outcome ${
+        match.result === "X" ? "btn-outcome-active" : ""
+      }`}
+      onClick={() => setMatchResult(match.id, "X")}
+    >
+      X
+    </button>
+    <button
+      className={`btn-outcome ${
+        match.result === "2" ? "btn-outcome-active" : ""
+      }`}
+      onClick={() => setMatchResult(match.id, "2")}
+    >
+      {match.away}
+    </button>
+    <button className="btn-secondary" onClick={() => setMatchResult(match.id, "")}>
+      Reset
+    </button>
+  </div>
+) : null}
 
                       <div className="match-result-text">
                         Actual result: <strong>{outcomeLabel(match.result, match)}</strong>
@@ -1693,20 +1702,22 @@ const currentParticipantId =
             <div className="grid-predictions">
               <Panel title="Controls">
                 <div className="stack-14">
-                  <div>
-                    <label className="label">Participant</label>
-                    <select
-                      className="input"
-                      value={selectedParticipantId}
-                      onChange={(e) => setSelectedParticipantId(e.target.value)}
-                    >
-                      {effectiveParticipants.map((participant) => (
-                        <option key={participant.id} value={participant.id}>
-                          {participant.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {isAdmin ? (
+  <div>
+    <label className="label">Participant</label>
+    <select
+      className="input"
+      value={selectedParticipantId}
+      onChange={(e) => setSelectedParticipantId(e.target.value)}
+    >
+      {competitionParticipants.map((participant) => (
+        <option key={participant.id} value={participant.id}>
+          {participant.name}
+        </option>
+      ))}
+    </select>
+  </div>
+) : null}
 
                   <div>
                     <label className="label">Round filter</label>
@@ -1726,13 +1737,15 @@ const currentParticipantId =
                   <div>
                     <label className="label">Tie-breaker: predicted champion</label>
                     <input
-                      className="input"
-                      placeholder="e.g. Brazil"
-                      value={effectiveChampionPick}
-                      onChange={async (e) => {
-  await updateCurrentUserChampionPick(e.target.value);
-}}
-                    />
+  className="input"
+  placeholder="e.g. Brazil"
+  value={effectiveChampionPick}
+  disabled={isAdmin}
+  onChange={async (e) => {
+    if (isAdmin) return;
+    await updateCurrentUserChampionPick(e.target.value);
+  }}
+/>
                   </div>
 
                   <div className="info-box">
@@ -1743,12 +1756,19 @@ const currentParticipantId =
                 </div>
               </Panel>
 
-              <Panel title={`Predictions — ${selectedParticipant?.name || "Participant"}`}>
+              <Panel
+  title={
+    isAdmin
+      ? `Predictions — ${selectedParticipant?.name || "Participant"}`
+      : "My Predictions"
+  }
+>
                 <div className="stack-12">
                   {filteredMatches.map((match) => {
                     const currentPick =
                     effectivePredictions[selectedParticipantId]?.[match.id] || "";
                     const locked = isLocked(match);
+                    const editingDisabled = isAdmin || locked;
 
                     return (
                       <div key={match.id} className="match-card">
@@ -1773,8 +1793,8 @@ const currentParticipantId =
                               key={option}
                               className={`btn-outcome ${
                                 currentPick === option ? "btn-outcome-dark-active" : ""
-                              } ${locked ? "btn-disabled" : ""}`}
-                              disabled={locked}
+                              } ${editingDisabled ? "btn-disabled" : ""}`}
+                              disabled={editingDisabled}
                               onClick={() =>
                                 updatePrediction(selectedParticipantId, match.id, option)
                               }
