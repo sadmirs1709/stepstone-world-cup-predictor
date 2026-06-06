@@ -276,6 +276,14 @@ const effectiveAllChampionPicks =
     ? allSharedChampionPicks
     : championTiebreak;
 
+    const isAdmin = currentProfile?.role === "admin";
+
+const competitionParticipants =
+  effectiveParticipants.filter((participant) => participant.role !== "admin");
+
+const currentParticipantId =
+  !isAdmin && currentProfile?.id ? String(currentProfile.id) : "";
+
     const visibleTabs = [
       ["overview", "Overview"],
       ["participants", "Participants"],
@@ -736,7 +744,7 @@ const effectiveAllChampionPicks =
   };
 
   const leaderboard = useMemo(() => {
-    const rows = effectiveParticipants.map((participant) => {
+    const rows = competitionParticipants.map((participant) => {
       let points = 0;
       let hits = 0;
       let entered = 0;
@@ -781,7 +789,7 @@ const effectiveAllChampionPicks =
 
     return rows;
   }, [
-    effectiveParticipants,
+    competitionParticipants,
     effectiveMatches,
     effectiveAllPredictions,
     effectiveAllChampionPicks,
@@ -792,7 +800,7 @@ const effectiveAllChampionPicks =
   const standingsByRound = useMemo(() => {
     const result = {};
     for (const round of rounds.filter((r) => r !== "All")) {
-      result[round] = effectiveParticipants
+      result[round] = competitionParticipants
         .map((participant) => {
           const roundMatches = effectiveMatches.filter((m) => m.round === round);
           const hits = roundMatches.filter(
@@ -811,12 +819,12 @@ const effectiveAllChampionPicks =
         .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     }
     return result;
-  }, [rounds, effectiveParticipants, effectiveMatches, effectiveAllPredictions, effectivePointsPerHit]);
+  }, [rounds, competitionParticipants, effectiveMatches, effectiveAllPredictions, effectivePointsPerHit]);
 
   const completedMatches = effectiveMatches.filter((m) => m.result).length;
   const lockedMatches = effectiveMatches.filter((m) => isLocked(m)).length;
   const openMatches = effectiveMatches.length - lockedMatches;
-  const totalPredictions = participants.length * effectiveMatches.length;
+  const totalPredictions = competitionParticipants.length * effectiveMatches.length;
 
   const enteredPredictions = participants.reduce((acc, participant) => {
     return acc + Object.values(predictions[participant.id] || {}).filter(Boolean).length;
@@ -1402,7 +1410,7 @@ const effectiveAllChampionPicks =
             </div>
 
             <div className="dashboard-side">
-            <StatCard label="Participants" value={effectiveParticipants.length} dark />
+            <StatCard label="Participants" value={competitionParticipants.length} dark />
               <StatCard label="Matches" value={effectiveMatches.length} dark />
               <StatCard label="Open" value={openMatches} dark />
               <StatCard label="Locked" value={lockedMatches} dark />
@@ -1525,7 +1533,7 @@ const effectiveAllChampionPicks =
 
               <Panel title="Participant list">
                 <div className="stack-10">
-                {effectiveParticipants.map((participant) => (
+                {competitionParticipants.map((participant) => (
                     <div key={participant.id} className="list-row">
                       <div>
                         <div className="list-title">{participant.name}</div>
@@ -1842,7 +1850,7 @@ const effectiveAllChampionPicks =
                     </thead>
 
                     <tbody>
-                    {effectiveParticipants.map((participant) => (
+                    {competitionParticipants.map((participant) => (
                         <tr key={participant.id}>
                           <td className="sticky-col matrix-participant-cell">
                             <div className="matrix-participant-name">
