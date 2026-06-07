@@ -199,6 +199,7 @@ export default function App() {
   const [summaryText, setSummaryText] = useState("");
   const [summaryCopied, setSummaryCopied] = useState(false);
   const [saveNotice, setSaveNotice] = useState("");
+  const [nowTick, setNowTick] = useState(Date.now());
 
   // Auth state
   const [user, setUser] = useState(null);
@@ -544,6 +545,30 @@ const currentParticipantId =
     }, 1500);
   }
 
+  function getKickoffCountdown(match) {
+    const kickoffDate = parseKickoff(match.kickoff);
+    if (!kickoffDate) return "";
+  
+    const diffMs = kickoffDate.getTime() - nowTick;
+  
+    if (diffMs <= 0) return "Locked";
+  
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+    const minutes = totalMinutes % 60;
+  
+    if (days > 0) {
+      return `Locks in ${days}d ${hours}h`;
+    }
+  
+    if (hours > 0) {
+      return `Locks in ${hours}h ${minutes}m`;
+    }
+  
+    return `Locks in ${minutes}m`;
+  }
+
   async function loadSharedProfiles() {
     setLoadingProfilesList(true);
   
@@ -713,6 +738,14 @@ const currentParticipantId =
       setSelectedParticipantId(currentParticipantId);
     }
   }, [isAdmin, currentParticipantId]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowTick(Date.now());
+    }, 60000);
+  
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -1945,6 +1978,7 @@ await loadCurrentUserPredictionData();
                               {match.home} vs {match.away}
                             </div>
                             <div className="match-kickoff">{formatDateTime(match.kickoff)}</div>
+                            <div className="match-kickoff">{getKickoffCountdown(match)}</div>
                           </div>
 
                           <StatusBadge
