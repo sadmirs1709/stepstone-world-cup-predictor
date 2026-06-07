@@ -1328,7 +1328,7 @@ const currentParticipantId =
               marginBottom: 20,
             }}
           >
-            Enter your work email address and we’ll send you a secure sign-in link.
+            Enter your email address to receive a secure sign-in link and join the competition in seconds.
           </p>
 
           <label
@@ -1552,7 +1552,7 @@ const currentParticipantId =
   </div>
 </Panel>
 
-              <Panel title="Participant list">
+<Panel title="Competition participants">
                 <div className="stack-10">
                 {competitionParticipants.map((participant) => (
                     <div key={participant.id} className="list-row">
@@ -1645,9 +1645,14 @@ const currentParticipantId =
               </Panel>
               ) : null}
 
-              <Panel title="Match list">
-                <div className="stack-12">
-                {effectiveMatches.map((match) => (
+<Panel title="⚽ Fixtures and results">
+              <div className="stack-12">
+  {effectiveMatches.length === 0 ? (
+    <div className="info-box">
+      No matches yet — the admin can add fixtures once the competition is ready.
+    </div>
+  ) : (
+    effectiveMatches.map((match) => (
                     <div key={match.id} className="match-card">
                       <div className="match-header">
                         <div>
@@ -1665,8 +1670,8 @@ const currentParticipantId =
                           />
 {isAdmin ? (
   <button className="btn-danger" onClick={() => removeMatch(match.id)}>
-    Delete
-  </button>
+  Delete match
+</button>
 ) : null}
                         </div>
                       </div>
@@ -1698,8 +1703,8 @@ const currentParticipantId =
       {match.away}
     </button>
     <button className="btn-secondary" onClick={() => setMatchResult(match.id, "")}>
-      Reset
-    </button>
+  Clear result
+</button>
   </div>
 ) : null}
 
@@ -1707,7 +1712,8 @@ const currentParticipantId =
                         Actual result: <strong>{outcomeLabel(match.result, match)}</strong>
                       </div>
                     </div>
-                  ))}
+                  ))
+                  )}
                 </div>
               </Panel>
             </div>
@@ -1715,7 +1721,7 @@ const currentParticipantId =
 
           {activeTab === "predictions" && (
             <div className="grid-predictions">
-              <Panel title="Controls">
+              <Panel title="Prediction Settings">
                 <div className="stack-14">
                 {isAdmin ? (
   <div>
@@ -1765,9 +1771,12 @@ const currentParticipantId =
 
                   <div className="info-box">
                   {effectiveLockPredictions
-  ? "Predictions are automatically locked at kickoff."
+  ? "Predictions lock automatically at kickoff."
   : "Prediction locking is currently disabled."}
                   </div>
+                  <div className="info-box">
+  Your predictions are saved automatically.
+</div>
                 </div>
               </Panel>
 
@@ -1778,8 +1787,13 @@ const currentParticipantId =
       : "My Predictions"
   }
 >
-                <div className="stack-12">
-                  {filteredMatches.map((match) => {
+<div className="stack-12">
+  {filteredMatches.length === 0 ? (
+    <div className="info-box">
+      No matches available for this round yet.
+    </div>
+  ) : (
+    filteredMatches.map((match) => {
                     const currentPick =
                     effectivePredictions[selectedParticipantId]?.[match.id] || "";
                     const locked = isLocked(match);
@@ -1832,7 +1846,8 @@ const currentParticipantId =
                         ) : null}
                       </div>
                     );
-                  })}
+                  })
+                  )}
                 </div>
               </Panel>
             </div>
@@ -1865,8 +1880,13 @@ const currentParticipantId =
                   </div>
                 </div>
 
-                <div className="matrix-wrap">
-                  <table className="matrix-table">
+                {filteredMatches.length === 0 || competitionParticipants.length === 0 ? (
+  <div className="info-box">
+    No matrix data available yet — add matches and participant predictions to see the comparison view.
+  </div>
+) : (
+  <div className="matrix-wrap">
+    <table className="matrix-table">
                     <thead>
                       <tr>
                         <th className="sticky-col sticky-head matrix-left-head">
@@ -1928,15 +1948,16 @@ const currentParticipantId =
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                    </table>
+</div>
+)}
               </Panel>
             </div>
           )}
 
           {activeTab === "leaderboard" && (
             <div className="grid-2">
-              <Panel title="Overall leaderboard">
+              <Panel title="🏆 Overall leaderboard">
                 <div className="toolbar-between">
                   <div className="small-muted">
                     Transparent ranking ready for internal sharing.
@@ -1946,8 +1967,13 @@ const currentParticipantId =
                   </button>
                 </div>
 
-                <div className="table-wrap">
-                  <table className="table">
+                {leaderboard.length === 0 ? (
+  <div className="info-box">
+    No leaderboard data yet — participants need to log in and submit predictions first.
+  </div>
+) : (
+  <div className="table-wrap">
+    <table className="table">
                     <thead>
                       <tr>
                         <th>#</th>
@@ -1961,7 +1987,14 @@ const currentParticipantId =
 
                     <tbody>
                       {leaderboard.map((row, index) => (
-                        <tr key={row.id}>
+                        <tr
+                        key={row.id}
+                        className={
+                          String(row.id) === String(currentProfile?.id)
+                            ? "leaderboard-current-user"
+                            : ""
+                        }
+                      >
                           <td>{index + 1}</td>
                           <td>
                             <div className="table-name">{row.name}</div>
@@ -1979,12 +2012,13 @@ const currentParticipantId =
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                    </table>
+</div>
+)}
               </Panel>
 
               <Panel title="Tie-break and rounds">
-                <label className="label">Actual tournament champion</label>
+              <label className="label">Official tournament champion</label>
                 <input
   className="input"
   placeholder="Enter this when the tournament ends"
@@ -2054,7 +2088,7 @@ const currentParticipantId =
                 />
               </Panel>
 
-              <Panel title="What is included">
+              <Panel title="Summary contents">
                 <div className="stack-10">
                   <div className="mini-stat">Top 5 leaderboard</div>
                   <div className="mini-stat">Latest completed matches</div>
@@ -2230,36 +2264,38 @@ const css = `
   .dashboard-main {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
   }
 
   .dashboard-badge {
     display: inline-flex;
     width: fit-content;
-    padding: 6px 12px;
+    padding: 7px 13px;
     border-radius: 999px;
     background: rgba(255,255,255,0.12);
     border: 1px solid rgba(255,255,255,0.14);
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
   }
 
   .dashboard-title {
     margin: 0;
     font-size: 42px;
-    line-height: 1.04;
+    line-height: 1.08;
     letter-spacing: -0.04em;
     color: white;
+    max-width: 760px;
   }
 
   .dashboard-subtitle {
-    margin: 0;
-    max-width: 760px;
-    line-height: 1.65;
+    margin: 4px 0 0;
+    max-width: 680px;
+    line-height: 1.7;
     color: rgba(255,255,255,0.84);
-    font-size: 15px;
+    font-size: 16px;
   }
 
   .status-strip {
@@ -2319,7 +2355,8 @@ const css = `
   .stat-label-dark {
     font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
+    font-weight: 700;
   }
 
   .stat-label {
@@ -2467,7 +2504,7 @@ const css = `
 
   .stack-8 { gap: 8px; }
   .stack-10 { gap: 10px; }
-  .stack-12 { gap: 12px; }
+  .stack-12 { gap: 14px; }
   .stack-14 { gap: 14px; }
 
   .rule-list { gap: 10px; }
@@ -2668,6 +2705,13 @@ const css = `
     font-weight: 800;
   }
 
+  .btn-primary:hover:not(.btn-disabled),
+.btn-secondary:hover:not(.btn-disabled),
+.btn-danger:hover:not(.btn-disabled),
+.btn-reset:hover:not(.btn-disabled) {
+  transform: translateY(-1px);
+}
+
   .btn-outcome {
     border: 1px solid #d7dee7;
     background: white;
@@ -2675,6 +2719,15 @@ const css = `
     padding: 10px 14px;
     min-width: 56px;
     font-weight: 800;
+    transition: all 0.15s ease;
+  }
+
+  .btn-outcome:active {
+    transform: scale(0.96);
+  }
+
+  .btn-outcome:hover:not(.btn-disabled) {
+    transform: translateY(-1px);
   }
 
   .btn-outcome:hover {
@@ -2697,7 +2750,7 @@ const css = `
   }
 
   .btn-disabled {
-    opacity: 0.55;
+    opacity: 0.6;
     cursor: not-allowed;
   }
 
@@ -2782,14 +2835,14 @@ const css = `
     border-bottom: 1px solid #e2e8f0;
     color: #64748b;
     font-size: 13px;
-    padding: 12px 10px;
+    padding: 10px 12px;
     vertical-align: top;
     background: #fafcff;
   }
 
   .table td {
     border-bottom: 1px solid #f1f5f9;
-    padding: 14px 10px;
+    padding: 10px 12px;
     vertical-align: top;
     font-size: 14px;
     background: white;
@@ -2797,6 +2850,11 @@ const css = `
 
   .table tr:hover td {
     background: #fbfdff;
+  }
+
+  .leaderboard-current-user td {
+    background: #eff6ff !important;
+    border-bottom: 1px solid #bfdbfe;
   }
 
   .td-strong {
