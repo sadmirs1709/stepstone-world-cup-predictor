@@ -1381,7 +1381,7 @@ const currentParticipantId =
       </div>
     );
   }
-  
+
   if (!user) {
     return (
       <div
@@ -1651,13 +1651,6 @@ const currentParticipantId =
           {activeTab === "participants" && (
             <div className="grid-2">
               <Panel title="Participants">
-  <div className="info-box">
-    <strong>Shared participant list</strong>
-    <div style={{ marginTop: 8 }}>
-      Participants are now created automatically when they log in to the app.
-      This list shows the real shared profile records from Supabase.
-    </div>
-  </div>
 
   <div className="section-top-gap">
     <StatusBadge
