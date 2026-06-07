@@ -211,6 +211,7 @@ export default function App() {
   const [loadingSharedData, setLoadingSharedData] = useState(true);
   const [currentProfile, setCurrentProfile] = useState(null);
 const [loadingProfile, setLoadingProfile] = useState(true);
+const [newName, setNewName] = useState("");
 
 const [sharedPredictions, setSharedPredictions] = useState({});
 const [sharedChampionPick, setSharedChampionPick] = useState("");
@@ -1267,6 +1268,120 @@ const currentParticipantId =
     );
   }
 
+  if (user && currentProfile && !currentProfile.display_name) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "#f6f8fb",
+          padding: 24,
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 460,
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 22,
+            padding: 28,
+            boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
+          }}
+        >
+          <div
+            style={{
+              display: "inline-flex",
+              padding: "6px 12px",
+              borderRadius: 999,
+              background: "#0f172a",
+              color: "white",
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              marginBottom: 16,
+            }}
+          >
+            OFFICE COMPETITION
+          </div>
+  
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 30,
+              lineHeight: 1.1,
+              letterSpacing: "-0.03em",
+              color: "#0f172a",
+            }}
+          >
+            Choose your participant name
+          </h1>
+  
+          <p
+            style={{
+              color: "#475569",
+              lineHeight: 1.6,
+              marginTop: 12,
+              marginBottom: 20,
+            }}
+          >
+            This is how your name will appear in the competition, leaderboard, and matrix.
+          </p>
+  
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Enter your name"
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 14,
+              border: "1px solid #cbd5e1",
+              marginBottom: 12,
+              fontSize: 14,
+              boxSizing: "border-box",
+            }}
+          />
+  
+          <button
+            onClick={async () => {
+              const trimmedName = newName.trim();
+              if (!trimmedName || !user?.id) return;
+  
+              const { error } = await supabase
+                .from("profiles")
+                .update({ display_name: trimmedName })
+                .eq("id", user.id);
+  
+              if (error) {
+                console.error("Failed updating display name:", error);
+                return;
+              }
+  
+              window.location.reload();
+            }}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 14,
+              background: "linear-gradient(180deg, #0f172a, #111827)",
+              color: "white",
+              border: "1px solid #0f172a",
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow: "0 10px 20px rgba(15, 23, 42, 0.16)",
+            }}
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
   if (!user) {
     return (
       <div
@@ -1339,13 +1454,13 @@ const currentParticipantId =
               color: "#334155",
             }}
           >
-            Work email
+            Email address
           </label>
 
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@company.com"
+            placeholder="name@example.com"
             style={{
               width: "100%",
               padding: "12px 14px",
