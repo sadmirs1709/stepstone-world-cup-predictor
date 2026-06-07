@@ -382,8 +382,18 @@ const currentParticipantId =
             home: row.home_team,
             away: row.away_team,
             kickoff: row.kickoff_at
-              ? new Date(row.kickoff_at).toISOString().slice(0, 16).replace("T", " ")
-              : "",
+            ? new Date(row.kickoff_at)
+                .toLocaleString("sv-SE", {
+                  timeZone: "Europe/Luxembourg",
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                })
+                .replace(",", "")
+            : "",
             result: row.result ?? "",
           }))
         );
