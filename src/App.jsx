@@ -125,6 +125,22 @@ function outcomeLabel(value, match) {
   return "—";
 }
 
+function formatActualResult(match) {
+  if (!match.result) return "No result yet";
+
+  const hasScore =
+    match.homeScore !== null &&
+    match.homeScore !== undefined &&
+    match.awayScore !== null &&
+    match.awayScore !== undefined;
+
+  const scoreText = hasScore ? ` (${match.homeScore}:${match.awayScore})` : "";
+
+  if (match.result === "1") return `${match.home} win${scoreText}`;
+  if (match.result === "2") return `${match.away} win${scoreText}`;
+  return `Draw${scoreText}`;
+}
+
 function outcomeBadge(value, match) {
   if (value === "1") return match.home;
   if (value === "X") return "X";
@@ -200,6 +216,7 @@ export default function App() {
   const [summaryCopied, setSummaryCopied] = useState(false);
   const [saveNotice, setSaveNotice] = useState("");
   const [nowTick, setNowTick] = useState(Date.now());
+  const [scoreInputs, setScoreInputs] = useState({});
 
   // Auth state
   const [user, setUser] = useState(null);
@@ -397,6 +414,8 @@ const currentParticipantId =
                 .replace(",", "")
             : "",
             result: row.result ?? "",
+            homeScore: row.home_score ?? null,
+awayScore: row.away_score ?? null,
           }))
         );
       } else {
@@ -748,6 +767,26 @@ const currentParticipantId =
   }, []);
 
   useEffect(() => {
+    const mappedScores = Object.fromEntries(
+      effectiveMatches.map((match) => [
+        String(match.id),
+        {
+          home:
+            match.homeScore !== null && match.homeScore !== undefined
+              ? String(match.homeScore)
+              : "",
+          away:
+            match.awayScore !== null && match.awayScore !== undefined
+              ? String(match.awayScore)
+              : "",
+        },
+      ])
+    );
+  
+    setScoreInputs(mappedScores);
+  }, [effectiveMatches]);  
+
+  useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
@@ -1044,6 +1083,56 @@ const currentParticipantId =
       console.error("Unexpected setMatchResult error:", err);
     }
   };
+
+  async function saveMatchScore(matchId) {
+    const current = scoreInputs[String(matchId)] || { home: "", away: "" };
+  
+    const homeRaw = current.home?.trim?.() ?? "";
+    const awayRaw = current.away?.trim?.() ?? "";
+  
+    if (homeRaw === "" || awayRaw === "") {
+      console.error("Both score fields must be filled.");
+      return;
+    }
+  
+    const homeScore = Number(homeRaw);
+    const awayScore = Number(awayRaw);
+  
+    if (
+      !Number.isInteger(homeScore) ||
+      !Number.isInteger(awayScore) ||
+      homeScore < 0 ||
+      awayScore < 0
+    ) {
+      console.error("Scores must be whole numbers greater than or equal to 0.");
+      return;
+    }
+  
+    let derivedResult = "X";
+    if (homeScore > awayScore) derivedResult = "1";
+    if (awayScore > homeScore) derivedResult = "2";
+  
+    try {
+      const { error } = await supabase
+        .from("matches")
+        .update({
+          home_score: homeScore,
+          away_score: awayScore,
+          result: derivedResult,
+        })
+        .eq("id", matchId);
+  
+      if (error) {
+        console.error("Failed saving match score:", error);
+        return;
+      }
+  
+      await loadSharedData();
+      showSaveNotice("Score saved ✅");
+    } catch (err) {
+      console.error("Unexpected saveMatchScore error:", err);
+    }
+  }
 
   const updatePrediction = async (_participantId, matchId, value) => {
     const match = effectiveMatches.find((m) => String(m.id) === String(matchId));
@@ -1838,8 +1927,9 @@ await loadCurrentUserPredictionData();
                         </div>
                       </div>
 
-                      {isAdmin ? (
-  <div className="button-row-wrap">
+{isAdmin ? (
+  <>
+    <div className="button-row-wrap">
     <button
       className={`btn-outcome ${
         match.result === "1" ? "btn-outcome-active" : ""
@@ -1867,11 +1957,54 @@ await loadCurrentUserPredictionData();
     <button className="btn-secondary" onClick={() => setMatchResult(match.id, "")}>
   Clear result
 </button>
-  </div>
+</div>
+
+<div className="score-row">
+  <input
+    className="score-input"
+    type="number"
+    min="0"
+    placeholder={match.home}
+    value={scoreInputs[String(match.id)]?.home || ""}
+    onChange={(e) =>
+      setScoreInputs((prev) => ({
+        ...prev,
+        [String(match.id)]: {
+          home: e.target.value,
+          away: prev[String(match.id)]?.away || "",
+        },
+      }))
+    }
+  />
+
+  <span className="score-separator">:</span>
+
+  <input
+    className="score-input"
+    type="number"
+    min="0"
+    placeholder={match.away}
+    value={scoreInputs[String(match.id)]?.away || ""}
+    onChange={(e) =>
+      setScoreInputs((prev) => ({
+        ...prev,
+        [String(match.id)]: {
+          home: prev[String(match.id)]?.home || "",
+          away: e.target.value,
+        },
+      }))
+    }
+  />
+
+  <button className="btn-primary" onClick={() => saveMatchScore(match.id)}>
+    Save score
+  </button>
+</div>
+</>
 ) : null}
 
                       <div className="match-result-text">
-                        Actual result: <strong>{outcomeLabel(match.result, match)}</strong>
+                        Actual result: <strong>{formatActualResult(match)}</strong>
                       </div>
                     </div>
                   ))
@@ -2831,6 +2964,30 @@ const css = `
     line-height: 1.6;
   }
 
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  
+  .score-input {
+    width: 72px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
+    font-size: 14px;
+    box-sizing: border-box;
+    background: white;
+    color: #0f172a;
+  }
+  
+  .score-separator {
+    font-weight: 800;
+    color: #334155;
+  }
+  
   .btn-primary,
   .btn-secondary,
   .btn-danger,
