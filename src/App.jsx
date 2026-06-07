@@ -1399,11 +1399,10 @@ const currentParticipantId =
         <div className="app-container">
           <section className="dashboard-hero">
             <div className="dashboard-main">
-              <div className="dashboard-badge">Final Office Version</div>
+              <div className="dashboard-badge">Office Competition</div>
               <h1 className="dashboard-title">{effectiveCompetitionName}</h1>
               <p className="dashboard-subtitle">
-                Internal 1 / X / 2 office prediction tracker for tournament outcome
-                picks, leaderboard management, daily updates, and team-wide visibility.
+              Pick your winners, track your score, and prove you are the office football expert!
               </p>
 
               <div className="status-strip">
