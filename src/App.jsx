@@ -198,6 +198,7 @@ export default function App() {
   const [bulkImportText, setBulkImportText] = useState("");
   const [summaryText, setSummaryText] = useState("");
   const [summaryCopied, setSummaryCopied] = useState(false);
+  const [saveNotice, setSaveNotice] = useState("");
 
   // Auth state
   const [user, setUser] = useState(null);
@@ -508,6 +509,7 @@ const currentParticipantId =
         }
   
         await loadCurrentUserPredictionData();
+        showSaveNotice("Champion pick cleared ✅");
         return;
       }
   
@@ -529,9 +531,17 @@ const currentParticipantId =
       }
   
       await loadCurrentUserPredictionData();
+      showSaveNotice("Champion pick saved ✅");
     } catch (err) {
       console.error("Unexpected updateCurrentUserChampionPick error:", err);
     }
+  }
+
+  function showSaveNotice(message = "Saved ✅") {
+    setSaveNotice(message);
+    setTimeout(() => {
+      setSaveNotice("");
+    }, 1500);
   }
 
   async function loadSharedProfiles() {
@@ -1021,12 +1031,13 @@ const currentParticipantId =
           }
         );
   
-      if (error) {
-        console.error("Failed updating prediction:", error);
-        return;
-      }
-  
-      await loadCurrentUserPredictionData();
+        if (error) {
+  console.error("Failed updating prediction:", error);
+  return;
+}
+
+await loadCurrentUserPredictionData();
+        showSaveNotice("Prediction saved ✅");
     } catch (err) {
       console.error("Unexpected updatePrediction error:", err);
     }
@@ -1888,15 +1899,23 @@ const currentParticipantId =
                   </div>
 
                   <div className="info-box">
-                  {effectiveLockPredictions
-  ? "Predictions lock automatically at kickoff."
-  : "Prediction locking is currently disabled."}
-                  </div>
-                  <div className="info-box">
+  {effectiveLockPredictions
+    ? "Predictions lock automatically at kickoff."
+    : "Prediction locking is currently disabled."}
+</div>
+
+<div className="info-box">
   Your predictions are saved automatically.
 </div>
-                </div>
-              </Panel>
+
+{saveNotice ? (
+  <div className="success-box">
+    {saveNotice}
+  </div>
+) : null}
+
+</div>
+</Panel>
 
               <Panel
   title={
@@ -3223,7 +3242,7 @@ const css = `
     padding-bottom: 8px;
     letter-spacing: 0.02em;
   }
-  
+
   @media (max-width: 1160px) {
     .dashboard-hero,
     .top-summary,
