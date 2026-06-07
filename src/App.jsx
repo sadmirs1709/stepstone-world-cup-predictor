@@ -2333,11 +2333,16 @@ const currentParticipantId =
               </Panel>
             </div>
           )}
+
+          <div className="app-credit">
+            Built by Sadmir Sivic
+          </div>
+      
         </div>
       </div>
-    </>
-  );
-}
+      </>
+      );
+      }
 
 const css = `
   * { box-sizing: border-box; }
@@ -3210,6 +3215,15 @@ const css = `
     z-index: 4;
   }
 
+  .app-credit {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 12px;
+    color: #64748b;
+    padding-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+  
   @media (max-width: 1160px) {
     .dashboard-hero,
     .top-summary,
