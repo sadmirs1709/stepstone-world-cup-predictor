@@ -1021,7 +1021,7 @@ const currentStageLabel = "Group Stage";
             </div>
 
             <div className="overview-feature-meta">
-              {formatDateTime(nextOpenMatch.kickoff)} (Luxembourg)
+              {formatDateTime(nextOpenMatch.kickoff)} (CEST)
             </div>
 
             <button
