@@ -1808,38 +1808,6 @@ await loadCurrentUserPredictionData();
             </div>
           </section>
 
-          <section className="top-summary">
-            <div className="summary-card">
-              <div className="summary-label">Current leader</div>
-              <div className="summary-value">{leaderboard[0]?.name || "—"}</div>
-              <div className="summary-meta">
-                {leaderboard[0] ? `${leaderboard[0].points} points` : "No data yet"}
-              </div>
-            </div>
-
-            <div className="summary-card">
-              <div className="summary-label">Next open match</div>
-              <div className="summary-value small">
-                {nextOpenMatch
-                  ? `${nextOpenMatch.home} vs ${nextOpenMatch.away}`
-                  : "No open matches"}
-              </div>
-              <div className="summary-meta">
-                {nextOpenMatch ? formatDateTime(nextOpenMatch.kickoff) : "—"}
-              </div>
-            </div>
-
-            <div className="summary-card">
-              <div className="summary-label">Competition status</div>
-              <div className="summary-value small">
-              {completedMatches}/{effectiveMatches.length} completed
-              </div>
-              <div className="summary-meta">
-                {enteredPredictions} prediction entries captured
-              </div>
-            </div>
-          </section>
-
           {overviewHeroCards}
 
           <section className="tabs-wrap">
@@ -3855,7 +3823,7 @@ const css = `
     .welcome-grid {
       grid-template-columns: 1fr;
     }
-    
+
     .dashboard-title {
       font-size: 30px;
     }
