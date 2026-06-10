@@ -937,9 +937,6 @@ awayScore: row.away_score ?? null,
 
   const currentLeader = leaderboard.length > 0 ? leaderboard[0] : null;
 
-const nextOpenMatch =
-  effectiveMatches.find((match) => !match.result && !isLocked(match)) || null;
-
 const matchProgressPct = totalTournamentMatches
   ? Math.round((completedMatches / totalTournamentMatches) * 100)
   : 0;
@@ -964,7 +961,7 @@ const currentStageLabel = "Group Stage";
 
   const nextOpenMatch = useMemo(() => {
     return effectiveMatches
-      .filter((m) => !isLocked(m))
+    .filter((m) => !m.result && !isLocked(m))
       .sort(
         (a, b) =>
           (parseKickoff(a.kickoff)?.getTime() || 0) -
