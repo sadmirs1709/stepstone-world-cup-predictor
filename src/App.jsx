@@ -969,6 +969,102 @@ const currentStageLabel = "Group Stage";
       )[0];
   }, [effectiveMatches, effectiveLockPredictions]);
 
+  const overviewHeroCards = (
+  
+<div className="overview-stack">
+    <div className="overview-grid-2">
+      <div className="overview-feature-card overview-feature-card-leader">
+        <div className="overview-card-label">🏆 Current Leader</div>
+
+        {currentLeader ? (
+          <>
+            <div className="overview-feature-title">{currentLeader.name}</div>
+            <div className="overview-feature-points">
+              {currentLeader.points} points
+            </div>
+
+            <button
+              className="overview-ghost-button"
+              onClick={() => setActiveTab("leaderboard")}
+            >
+              View leaderboard →
+            </button>
+          </>
+        ) : (
+          <div className="info-box">
+            No leaderboard data available yet.
+          </div>
+        )}
+      </div>
+
+      <div className="overview-feature-card overview-feature-card-match">
+        <div className="overview-card-label">📅 Next Open Match</div>
+
+        {nextOpenMatch ? (
+          <>
+            <div className="overview-feature-title">
+              {nextOpenMatch.home} vs {nextOpenMatch.away}
+            </div>
+
+            <div className="overview-feature-meta">
+              {formatDateTime(nextOpenMatch.kickoff)} (Luxembourg)
+            </div>
+
+            <button
+              className="overview-primary-button"
+              onClick={() => setActiveTab("predictions")}
+            >
+              Make your predictions →
+            </button>
+          </>
+        ) : (
+          <div className="info-box">
+            No open matches available right now.
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div className="overview-status-card">
+      <div className="overview-card-label">📊 Competition Status</div>
+
+      <div className="overview-status-grid">
+        <div className="overview-progress-box">
+          <div
+            className="overview-progress-ring"
+            style={{ "--overview-progress": matchProgressPct }}
+          >
+            <div className="overview-progress-ring-inner">
+              {matchProgressPct}%
+            </div>
+          </div>
+
+          <div className="overview-progress-text">
+            <div className="overview-progress-value">
+              {completedMatches}/{totalTournamentMatches}
+            </div>
+            <div className="overview-progress-label">matches completed</div>
+          </div>
+        </div>
+
+        <div className="overview-status-notes">
+          <div className="overview-note-card">
+            <div className="overview-note-title">⏳ Predictions lock at kickoff</div>
+            <div className="overview-note-text">
+              Make sure to submit before kickoff to secure your points.
+            </div>
+          </div>
+
+          <div className="overview-note-card">
+            <div className="overview-note-title">🏁 Current stage</div>
+            <div className="overview-note-text">{currentStageLabel}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
   const lastSettledMatches = useMemo(() => {
     return effectiveMatches.filter((m) => m.result).slice(-5).reverse();
   }, [effectiveMatches]);
@@ -1744,6 +1840,8 @@ await loadCurrentUserPredictionData();
             </div>
           </section>
 
+          {overviewHeroCards}
+
           <section className="tabs-wrap">
   {visibleTabs.map(([key, label]) => (
     <button
@@ -1756,100 +1854,55 @@ await loadCurrentUserPredictionData();
   ))}
 </section>
 
-          {activeTab === "overview" && (
-            <div className="overview-stack">
-            <div className="overview-grid-2">
-              <div className="overview-feature-card overview-feature-card-leader">
-                <div className="overview-card-label">🏆 Current Leader</div>
-          
-                {currentLeader ? (
-                  <>
-                    <div className="overview-feature-title">{currentLeader.name}</div>
-                    <div className="overview-feature-points">
-                      {currentLeader.points} points
-                    </div>
-          
-                    <button
-                      className="overview-ghost-button"
-                      onClick={() => setActiveTab("leaderboard")}
-                    >
-                      View leaderboard →
-                    </button>
-                  </>
-                ) : (
-                  <div className="info-box">
-                    No leaderboard data available yet.
-                  </div>
-                )}
-              </div>
-          
-              <div className="overview-feature-card overview-feature-card-match">
-                <div className="overview-card-label">📅 Next Open Match</div>
-          
-                {nextOpenMatch ? (
-                  <>
-                    <div className="overview-feature-title">
-                      {nextOpenMatch.home} vs {nextOpenMatch.away}
-                    </div>
-          
-                    <div className="overview-feature-meta">
-                      {formatDateTime(nextOpenMatch.kickoff)} (Luxembourg)
-                    </div>
-          
-                    <button
-                      className="overview-primary-button"
-                      onClick={() => setActiveTab("predictions")}
-                    >
-                      Make your predictions →
-                    </button>
-                  </>
-                ) : (
-                  <div className="info-box">
-                    No open matches available right now.
-                  </div>
-                )}
-              </div>
-            </div>
-          
-            <div className="overview-status-card">
-              <div className="overview-card-label">📊 Competition Status</div>
-          
-              <div className="overview-status-grid">
-                <div className="overview-progress-box">
-                <div
-  className="overview-progress-ring"
-  style={{ "--overview-progress": matchProgressPct }}
->
-                    <div className="overview-progress-ring-inner">
-                      {matchProgressPct}%
-                    </div>
-                  </div>
-          
-                  <div className="overview-progress-text">
-                    <div className="overview-progress-value">
-                      {completedMatches}/{totalTournamentMatches}
-                    </div>
-                    <div className="overview-progress-label">matches completed</div>
-                  </div>
-                </div>
-          
-                <div className="overview-status-notes">
-                  <div className="overview-note-card">
-                    <div className="overview-note-title">⏳ Predictions lock at kickoff</div>
-                    <div className="overview-note-text">
-                      Make sure to submit before kickoff to secure your points.
-                    </div>
-                  </div>
-          
-                  <div className="overview-note-card">
-                    <div className="overview-note-title">🏁 Current stage</div>
-                    <div className="overview-note-text">{currentStageLabel}</div>
-                  </div>
-                </div>
+{activeTab === "overview" && (
+  <div className="grid-1">
+    <Panel title="👋 Welcome">
+      <div className="welcome-shell">
+        <div className="welcome-intro">
+          Welcome to the StepStone World Cup Predictor 2026! Use the tabs above to
+          manage participants, check matches, make predictions, view the matrix,
+          track the leaderboard, and read the official rules.
+        </div>
+
+        <div className="welcome-grid">
+          <div className="welcome-item">
+            <div className="welcome-icon">🎯</div>
+            <div>
+              <div className="welcome-item-title">Make your predictions</div>
+              <div className="welcome-item-text">
+                Submit your 1 / X / 2 predictions before each match kicks off.
               </div>
             </div>
           </div>
-          )}
+
+          <div className="welcome-item">
+            <div className="welcome-icon">🏆</div>
+            <div>
+              <div className="welcome-item-title">Track your progress</div>
+              <div className="welcome-item-text">
+                Earn points for correct outcomes and climb the leaderboard.
+              </div>
+            </div>
+          </div>
+
+          <div className="welcome-item">
+            <div className="welcome-icon">⭐</div>
+            <div>
+              <div className="welcome-item-title">Be the champion</div>
+              <div className="welcome-item-text">
+                Pick the overall champion and break ties if it comes to that!
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="welcome-banner">
+          🔒 Predictions lock at kickoff. Good luck and enjoy the competition!
+        </div>
+      </div>
+    </Panel>
+  </div>
+)}
 
           {activeTab === "participants" && (
             <div className="grid-2">
@@ -2803,26 +2856,26 @@ const css = `
   }
 
   .tabs-wrap {
+    margin-top: 18px;
     display: flex;
-    gap: 8px;
     flex-wrap: wrap;
-    padding: 10px;
-    background: rgba(255,255,255,0.86);
-    backdrop-filter: blur(10px);
+    gap: 10px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.96);
     border: 1px solid #e2e8f0;
-    border-radius: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+    border-radius: 24px;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
   }
 
   .tab-btn {
-    border: 1px solid transparent;
+    border: none;
     background: transparent;
-    color: #475569;
-    padding: 10px 16px;
-    border-radius: 12px;
-    cursor: pointer;
+    color: #64748b;
     font-weight: 700;
+    font-size: 14px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    cursor: pointer;
     transition: all 0.18s ease;
   }
 
@@ -2832,10 +2885,14 @@ const css = `
   }
 
   .tab-btn-active {
-    background: #0f172a;
-    color: white;
-    border-color: #0f172a;
-    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+    background: #f5f3ff;
+    color: #6d28d9;
+    box-shadow: inset 0 0 0 1px #ddd6fe;
+  }
+
+  .tab-btn:hover {
+    background: #f8fafc;
+    color: #334155;
   }
 
   .panel {
@@ -3697,6 +3754,68 @@ const css = `
     color: #64748b;
   }
   
+  .welcome-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .welcome-intro {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #475569;
+  }
+  
+  .welcome-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  
+  .welcome-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 16px;
+    border-radius: 20px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+  }
+  
+  .welcome-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #f1f5f9;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  
+  .welcome-item-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  
+  .welcome-item-text {
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #64748b;
+  }
+  
+  .welcome-banner {
+    border-radius: 18px;
+    padding: 16px 18px;
+    background: #ecfdf5;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
   @media (max-width: 860px) {
     .overview-grid-2,
     .overview-status-grid {
@@ -3733,6 +3852,10 @@ const css = `
       border-radius: 24px;
     }
 
+    .welcome-grid {
+      grid-template-columns: 1fr;
+    }
+    
     .dashboard-title {
       font-size: 30px;
     }
