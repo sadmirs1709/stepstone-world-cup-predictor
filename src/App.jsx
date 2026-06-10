@@ -935,6 +935,10 @@ awayScore: row.away_score ?? null,
 
   const totalTournamentMatches = 104;
 
+  const displayTotalMatches = 104;
+const displayOpenMatches = 72;
+const displayLockedMatches = 32;
+
   const currentLeader = leaderboard.length > 0 ? leaderboard[0] : null;
 
 const matchProgressPct = totalTournamentMatches
@@ -1796,9 +1800,9 @@ await loadCurrentUserPredictionData();
 
             <div className="dashboard-side">
   <StatCard label="Participants" value={competitionParticipants.length} dark />
-  <StatCard label="Matches" value={effectiveMatches.length} dark />
-  <StatCard label="Open matches" value={openMatches} dark />
-  <StatCard label="Locked matches" value={lockedMatches} dark />
+  <StatCard label="Matches" value={displayTotalMatches} dark />
+  <StatCard label="Open matches" value={displayOpenMatches} dark />
+  <StatCard label="Locked matches" value={displayLockedMatches} dark />
 </div>
 
           </section>
@@ -2412,29 +2416,6 @@ await loadCurrentUserPredictionData();
   }}
 />
 
-                <div className="section-top-gap">
-                  <div className="section-subtitle">Round leaders</div>
-                  <div className="stack-10">
-                    {rounds
-                      .filter((round) => round !== "All")
-                      .map((round) => (
-                        <div key={round} className="round-card">
-                          <div className="round-title">{round}</div>
-
-                          <div className="stack-8">
-                            {(standingsByRound[round] || []).slice(0, 3).map((row, index) => (
-                              <div key={row.participantId} className="round-row">
-                                <span>
-                                  #{index + 1} {row.name}
-                                </span>
-                                <strong>{row.points} pts</strong>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
               </Panel>
             </div>
           )}
