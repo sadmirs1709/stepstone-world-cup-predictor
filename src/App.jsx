@@ -973,6 +973,16 @@ const currentStageLabel = "Group Stage";
       )[0];
   }, [effectiveMatches, effectiveLockPredictions]);
 
+  function goToTab(tabKey) {
+    setActiveTab(tabKey);
+  
+    setTimeout(() => {
+      document
+        .getElementById("tab-content-start")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
   const overviewHeroCards = (
   
 <div className="overview-stack">
@@ -989,7 +999,7 @@ const currentStageLabel = "Group Stage";
 
             <button
               className="overview-ghost-button"
-              onClick={() => setActiveTab("leaderboard")}
+              onClick={() => goToTab("leaderboard")}
             >
               View leaderboard →
             </button>
@@ -1016,7 +1026,7 @@ const currentStageLabel = "Group Stage";
 
             <button
               className="overview-primary-button"
-              onClick={() => setActiveTab("predictions")}
+              onClick={() => goToTab("predictions")}
             >
               Make your predictions →
             </button>
@@ -1820,6 +1830,8 @@ await loadCurrentUserPredictionData();
     </button>
   ))}
 </section>
+
+<div id="tab-content-start" />
 
 {activeTab === "overview" && (
   <div className="grid-1">
