@@ -1048,12 +1048,12 @@ const currentStageLabel = "Group Stage";
         </div>
 
         <div className="overview-status-notes">
-          <div className="overview-note-card">
-            <div className="overview-note-title">⏳ Predictions lock at kickoff</div>
-            <div className="overview-note-text">
-              Make sure to submit before kickoff to secure your points.
-            </div>
-          </div>
+        <div className="overview-note-card">
+  <div className="overview-note-title">🔄 Live competition updates</div>
+  <div className="overview-note-text">
+    Refresh the page anytime to see the latest match results and leaderboard changes.
+  </div>
+</div>
 
           <div className="overview-note-card">
             <div className="overview-note-title">🏁 Current stage</div>
@@ -1799,12 +1799,6 @@ await loadCurrentUserPredictionData();
   <StatCard label="Matches" value={effectiveMatches.length} dark />
   <StatCard label="Open matches" value={openMatches} dark />
   <StatCard label="Locked matches" value={lockedMatches} dark />
-  <StatCard
-    label="Match progress"
-    value={`${completedMatches}/${totalTournamentMatches}`}
-    dark
-  />
-  <StatCard label="Current stage" value={currentStageLabel} dark />
 </div>
 
           </section>
