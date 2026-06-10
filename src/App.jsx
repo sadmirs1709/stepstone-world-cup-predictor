@@ -311,6 +311,7 @@ const currentParticipantId =
     ["predictions", "Predictions"],
     ["matrix", "Matrix"],
     ["leaderboard", "Leaderboard"],
+    ["rules", "Rules"],
     ...(isAdmin
       ? [
           ["communications", "Communications"],
@@ -931,6 +932,20 @@ awayScore: row.away_score ?? null,
   const openMatches = effectiveMatches.filter(
     (m) => !m.result && !isLocked(m)
   ).length;
+
+  const totalTournamentMatches = 104;
+
+  const currentLeader = leaderboard.length > 0 ? leaderboard[0] : null;
+
+const nextOpenMatch =
+  effectiveMatches.find((match) => !match.result && !isLocked(match)) || null;
+
+const matchProgressPct = totalTournamentMatches
+  ? Math.round((completedMatches / totalTournamentMatches) * 100)
+  : 0;
+
+const currentStageLabel = "Group Stage";
+
   const totalPredictions =
   competitionParticipants.length * effectiveMatches.length;
 
@@ -1745,50 +1760,98 @@ await loadCurrentUserPredictionData();
 </section>
 
           {activeTab === "overview" && (
-            <div className="grid-3">
-              {isAdmin ? (
-  <Panel title="How it works">
-    <ol className="ordered-list">
-      <li>Add participants or keep the placeholders for now.</li>
-      <li>Add matches manually or import them in bulk.</li>
-      <li>Each participant predicts only 1 / X / 2.</li>
-      <li>Enter the actual result after the match ends.</li>
-      <li>The leaderboard updates automatically.</li>
-    </ol>
-  </Panel>
-) : null}
-
-              <Panel title="Official rules">
-                <div className="rule-list">
-                  {RULES.map((rule, index) => (
-                    <div key={index} className="rule-item">
-                      <div className="rule-index">{index + 1}.</div>
-                      <div>{rule}</div>
+            <div className="overview-stack">
+            <div className="overview-grid-2">
+              <div className="overview-feature-card overview-feature-card-leader">
+                <div className="overview-card-label">🏆 Current Leader</div>
+          
+                {currentLeader ? (
+                  <>
+                    <div className="overview-feature-title">{currentLeader.name}</div>
+                    <div className="overview-feature-points">
+                      {currentLeader.points} points
                     </div>
-                  ))}
-                </div>
-              </Panel>
-
-              <Panel title="Top 5 right now">
-                <div className="stack-10">
-                  {leaderboard.slice(0, 5).map((row, index) => (
-                    <div key={row.id} className="rank-card">
-                      <div>
-                        <div className="rank-position">#{index + 1}</div>
-                        <div className="rank-name">{row.name}</div>
-                        <div className="rank-meta">
-                          Correct picks: {row.hits} · Completion: {row.completion}%
-                        </div>
-                      </div>
-                      <div className="rank-points-block">
-                        <div className="rank-points">{row.points}</div>
-                        <div className="rank-meta">points</div>
-                      </div>
+          
+                    <button
+                      className="overview-ghost-button"
+                      onClick={() => setActiveTab("leaderboard")}
+                    >
+                      View leaderboard →
+                    </button>
+                  </>
+                ) : (
+                  <div className="info-box">
+                    No leaderboard data available yet.
+                  </div>
+                )}
+              </div>
+          
+              <div className="overview-feature-card overview-feature-card-match">
+                <div className="overview-card-label">📅 Next Open Match</div>
+          
+                {nextOpenMatch ? (
+                  <>
+                    <div className="overview-feature-title">
+                      {nextOpenMatch.home} vs {nextOpenMatch.away}
                     </div>
-                  ))}
-                </div>
-              </Panel>
+          
+                    <div className="overview-feature-meta">
+                      {formatDateTime(nextOpenMatch.kickoff)} (Luxembourg)
+                    </div>
+          
+                    <button
+                      className="overview-primary-button"
+                      onClick={() => setActiveTab("predictions")}
+                    >
+                      Make your predictions →
+                    </button>
+                  </>
+                ) : (
+                  <div className="info-box">
+                    No open matches available right now.
+                  </div>
+                )}
+              </div>
             </div>
+          
+            <div className="overview-status-card">
+              <div className="overview-card-label">📊 Competition Status</div>
+          
+              <div className="overview-status-grid">
+                <div className="overview-progress-box">
+                <div
+  className="overview-progress-ring"
+  style={{ "--overview-progress": matchProgressPct }}
+>
+                    <div className="overview-progress-ring-inner">
+                      {matchProgressPct}%
+                    </div>
+                  </div>
+          
+                  <div className="overview-progress-text">
+                    <div className="overview-progress-value">
+                      {completedMatches}/{totalTournamentMatches}
+                    </div>
+                    <div className="overview-progress-label">matches completed</div>
+                  </div>
+                </div>
+          
+                <div className="overview-status-notes">
+                  <div className="overview-note-card">
+                    <div className="overview-note-title">⏳ Predictions lock at kickoff</div>
+                    <div className="overview-note-text">
+                      Make sure to submit before kickoff to secure your points.
+                    </div>
+                  </div>
+          
+                  <div className="overview-note-card">
+                    <div className="overview-note-title">🏁 Current stage</div>
+                    <div className="overview-note-text">{currentStageLabel}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           )}
 
           {activeTab === "participants" && (
@@ -2362,6 +2425,21 @@ await loadCurrentUserPredictionData();
               </Panel>
             </div>
           )}
+
+{activeTab === "rules" && (
+  <div className="grid-1">
+    <Panel title="Official rules">
+      <div className="rule-list">
+        {RULES.map((rule, index) => (
+          <div key={index} className="rule-item">
+            <div className="rule-index">{index + 1}</div>
+            <div>{rule}</div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  </div>
+)}
 
           {activeTab === "communications" && (
             <div className="grid-2-wide">
@@ -3432,6 +3510,205 @@ const css = `
     color: #64748b;
     padding-bottom: 8px;
     letter-spacing: 0.02em;
+  }
+
+  .overview-stack {
+    display: grid;
+    gap: 16px;
+  }
+  
+  .overview-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  
+  .overview-feature-card,
+  .overview-status-card {
+    border-radius: 24px;
+    padding: 20px;
+    color: white;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+  }
+  
+  .overview-feature-card {
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  
+  .overview-feature-card-leader {
+    background:
+      linear-gradient(180deg, rgba(16, 23, 53, 0.92), rgba(23, 37, 84, 0.9)),
+      radial-gradient(circle at top right, rgba(255,255,255,0.12), transparent 45%);
+  }
+  
+  .overview-feature-card-match {
+    background:
+      linear-gradient(180deg, rgba(6, 95, 70, 0.92), rgba(15, 118, 110, 0.9)),
+      radial-gradient(circle at top right, rgba(255,255,255,0.12), transparent 45%);
+  }
+  
+  .overview-status-card {
+    background: rgba(255,255,255,0.96);
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
+  }
+  
+  .overview-card-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 800;
+    opacity: 0.8;
+  }
+  
+  .overview-feature-title {
+    margin-top: 18px;
+    font-size: 28px;
+    line-height: 1.12;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+  
+  .overview-feature-points {
+    margin-top: 8px;
+    font-size: 18px;
+    color: rgba(255,255,255,0.84);
+  }
+  
+  .overview-feature-meta {
+    margin-top: 12px;
+    font-size: 15px;
+    color: rgba(255,255,255,0.85);
+    line-height: 1.5;
+  }
+  
+  .overview-ghost-button,
+  .overview-primary-button {
+    margin-top: 18px;
+    border: none;
+    border-radius: 16px;
+    padding: 12px 16px;
+    font-weight: 800;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+  
+  .overview-ghost-button {
+    background: rgba(255,255,255,0.08);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.14);
+  }
+  
+  .overview-primary-button {
+    background: rgba(255,255,255,0.95);
+    color: #065f46;
+  }
+  
+  .overview-ghost-button:hover,
+  .overview-primary-button:hover {
+    transform: translateY(-1px);
+  }
+  
+  .overview-status-grid {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 18px;
+  }
+  
+  .overview-progress-box {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 18px;
+  }
+  
+  .overview-progress-ring {
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    background: conic-gradient(
+      #22c55e 0deg,
+      #22c55e calc(var(--overview-progress, 0) * 3.6deg),
+      #e5e7eb calc(var(--overview-progress, 0) * 3.6deg),
+      #e5e7eb 360deg
+    );
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  
+  .overview-progress-ring-inner {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: white;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    color: #0f172a;
+    font-size: 20px;
+  }
+  
+  .overview-progress-text {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .overview-progress-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+  }
+  
+  .overview-progress-label {
+    font-size: 14px;
+    color: #64748b;
+  }
+  
+  .overview-status-notes {
+    display: grid;
+    gap: 14px;
+  }
+  
+  .overview-note-card {
+    border-radius: 20px;
+    padding: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+  }
+  
+  .overview-note-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  
+  .overview-note-text {
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: #64748b;
+  }
+  
+  @media (max-width: 860px) {
+    .overview-grid-2,
+    .overview-status-grid {
+      grid-template-columns: 1fr;
+    }
+  
+    .overview-progress-box {
+      justify-content: flex-start;
+    }
   }
 
   @media (max-width: 1160px) {
