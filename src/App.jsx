@@ -936,8 +936,8 @@ awayScore: row.away_score ?? null,
   const totalTournamentMatches = 104;
 
   const displayTotalMatches = 104;
-const displayOpenMatches = 72;
-const displayLockedMatches = 32;
+  const displayOpenMatches = openMatches;
+  const displayLockedMatches = displayTotalMatches - displayOpenMatches;
 
   const currentLeader = leaderboard.length > 0 ? leaderboard[0] : null;
 
