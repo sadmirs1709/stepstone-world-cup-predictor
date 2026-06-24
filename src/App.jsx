@@ -293,6 +293,11 @@ const effectiveChampionPick =
     ? allSharedPredictions
     : predictions;
 
+const effectiveAllScorePredictions =
+  Object.keys(allSharedScorePredictions).length > 0
+    ? allSharedScorePredictions
+    : {};
+
 const effectiveAllChampionPicks =
   Object.keys(allSharedChampionPicks).length > 0
     ? allSharedChampionPicks
@@ -710,6 +715,7 @@ setAllSharedScorePredictions(mappedScorePredictions);
     } catch (err) {
       console.error("Unexpected loadAllSharedPredictionData error:", err);
       setAllSharedPredictions({});
+      setAllSharedScorePredictions({});
       setAllSharedChampionPicks({});
     } finally {
       setLoadingAllSharedData(false);
@@ -3849,11 +3855,12 @@ const css = `
     color: rgba(255,255,255,0.82);
   }
   
-  .overview-feature-meta {.overview-feature-meta margin-top: 12px;
+  .overview-feature-meta {
+    margin-top: 12px;
     font-size: 16px;
     color: rgba(255,255,255,0.84);
     line-height: 1.55;
-  }  
+  }
   
   .overview-ghost-button,
   .overview-primary-button {
