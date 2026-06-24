@@ -233,6 +233,7 @@ const [loadingProfile, setLoadingProfile] = useState(true);
 const [newName, setNewName] = useState("");
 
 const [sharedPredictions, setSharedPredictions] = useState({});
+const [scorePredictions, setScorePredictions] = useState({});
 const [sharedChampionPick, setSharedChampionPick] = useState("");
 const [loadingPredictions, setLoadingPredictions] = useState(true);
 
@@ -240,6 +241,7 @@ const [sharedProfiles, setSharedProfiles] = useState([]);
 const [loadingProfilesList, setLoadingProfilesList] = useState(true);
 
 const [allSharedPredictions, setAllSharedPredictions] = useState({});
+const [allSharedScorePredictions, setAllSharedScorePredictions] = useState({});
 const [allSharedChampionPicks, setAllSharedChampionPicks] = useState({});
 const [loadingAllSharedData, setLoadingAllSharedData] = useState(true);
 
@@ -463,6 +465,7 @@ awayScore: row.away_score ?? null,
   async function loadCurrentUserPredictionData() {
     if (!user?.id) {
       setSharedPredictions({});
+      setScorePredictions({});
       setSharedChampionPick("");
       setLoadingPredictions(false);
       return;
@@ -489,12 +492,28 @@ awayScore: row.away_score ?? null,
       if (predictionsError) {
         console.error("Failed loading current user predictions:", predictionsError);
         setSharedPredictions({});
+        setScorePredictions({});
       } else {
         const mapped = {};
+        const scoreMapped = {};
+        
         for (const row of predictionRows || []) {
           mapped[row.match_id] = row.prediction;
+        
+          scoreMapped[row.match_id] = {
+            home:
+              row.predicted_home_score !== null && row.predicted_home_score !== undefined
+                ? String(row.predicted_home_score)
+                : "",
+            away:
+              row.predicted_away_score !== null && row.predicted_away_score !== undefined
+                ? String(row.predicted_away_score)
+                : "",
+          };
         }
+        
         setSharedPredictions(mapped);
+        setScorePredictions(scoreMapped);
       }
   
       if (championError && championError.code !== "PGRST116") {
@@ -563,6 +582,10 @@ awayScore: row.away_score ?? null,
     setTimeout(() => {
       setSaveNotice("");
     }, 1500);
+  }
+
+  function allowsScorePrediction(match) {
+    return match?.round && match.round !== "Group Stage";
   }
 
   function getKickoffCountdown(match) {
@@ -639,19 +662,39 @@ awayScore: row.away_score ?? null,
       if (predictionsError) {
         console.error("Failed loading all shared predictions:", predictionsError);
         setAllSharedPredictions({});
+        setAllSharedScorePredictions({});
       } else {
         const mappedPredictions = {};
-        for (const row of predictionRows || []) {
-          const userId = String(row.user_id);
-          const matchId = String(row.match_id);
-  
-          if (!mappedPredictions[userId]) {
-            mappedPredictions[userId] = {};
-          }
-  
-          mappedPredictions[userId][matchId] = row.prediction;
-        }
-        setAllSharedPredictions(mappedPredictions);
+const mappedScorePredictions = {};
+
+for (const row of predictionRows || []) {
+  const userId = String(row.user_id);
+  const matchId = String(row.match_id);
+
+  if (!mappedPredictions[userId]) {
+    mappedPredictions[userId] = {};
+  }
+
+  if (!mappedScorePredictions[userId]) {
+    mappedScorePredictions[userId] = {};
+  }
+
+  mappedPredictions[userId][matchId] = row.prediction;
+
+  mappedScorePredictions[userId][matchId] = {
+    home:
+      row.predicted_home_score !== null && row.predicted_home_score !== undefined
+        ? Number(row.predicted_home_score)
+        : null,
+    away:
+      row.predicted_away_score !== null && row.predicted_away_score !== undefined
+        ? Number(row.predicted_away_score)
+        : null,
+  };
+}
+
+setAllSharedPredictions(mappedPredictions);
+setAllSharedScorePredictions(mappedScorePredictions);
       }
   
       if (championError) {
@@ -854,14 +897,46 @@ awayScore: row.away_score ?? null,
       let entered = 0;
 
       for (const match of effectiveMatches) {
-        const pick = effectiveAllPredictions[String(participant.id)]?.[String(match.id)];
-        if (pick) entered += 1;
-        if (pick && match.result && pick === match.result) {
+        const participantId = String(participant.id);
+        const matchId = String(match.id);
+      
+        const pick = effectiveAllPredictions[participantId]?.[matchId];
+        const scorePick = effectiveAllScorePredictions[participantId]?.[matchId];
+      
+        const hasOutcomePick = Boolean(pick);
+      
+        const hasScorePick =
+          scorePick &&
+          scorePick.home !== null &&
+          scorePick.home !== undefined &&
+          scorePick.away !== null &&
+          scorePick.away !== undefined;
+      
+        if (hasOutcomePick || hasScorePick) entered += 1;
+      
+        if (hasOutcomePick && match.result && pick === match.result) {
           points += effectivePointsPerHit;
           hits += 1;
         }
+      
+        const hasActualScore =
+          match.homeScore !== null &&
+          match.homeScore !== undefined &&
+          match.awayScore !== null &&
+          match.awayScore !== undefined;
+      
+        const exactScoreCorrect =
+          allowsScorePrediction(match) &&
+          hasScorePick &&
+          hasActualScore &&
+          Number(scorePick.home) === Number(match.homeScore) &&
+          Number(scorePick.away) === Number(match.awayScore);
+      
+        if (exactScoreCorrect) {
+          points += 3;
+        }
       }
-
+      
       const championPick = effectiveAllChampionPicks[String(participant.id)] || "";
       const championHit =
         effectiveActualChampion &&
@@ -896,6 +971,7 @@ awayScore: row.away_score ?? null,
     competitionParticipants,
     effectiveMatches,
     effectiveAllPredictions,
+    effectiveAllScorePredictions,
     effectiveAllChampionPicks,
     effectiveActualChampion,
     effectivePointsPerHit,
@@ -1286,6 +1362,63 @@ await loadCurrentUserPredictionData();
       console.error("Unexpected updatePrediction error:", err);
     }
   };
+
+  async function updateScorePrediction(matchId) {
+    if (!user?.id) return;
+  
+    const current = scorePredictions[String(matchId)] || { home: "", away: "" };
+  
+    const homeRaw = current.home?.trim?.() ?? "";
+    const awayRaw = current.away?.trim?.() ?? "";
+  
+    if (homeRaw === "" || awayRaw === "") {
+      showSaveNotice("Enter both scores first");
+      return;
+    }
+  
+    const homeScore = Number(homeRaw);
+    const awayScore = Number(awayRaw);
+  
+    if (
+      !Number.isInteger(homeScore) ||
+      !Number.isInteger(awayScore) ||
+      homeScore < 0 ||
+      awayScore < 0
+    ) {
+      showSaveNotice("Scores must be whole numbers");
+      return;
+    }
+  
+    try {
+      const { error } = await supabase
+  .from("predictions")
+  .upsert(
+    {
+      user_id: user.id,
+      match_id: matchId,
+      prediction:
+        sharedPredictions[matchId] ||
+        sharedPredictions[String(matchId)] ||
+        null,
+      predicted_home_score: homeScore,
+      predicted_away_score: awayScore,
+    },
+    {
+      onConflict: "user_id,match_id",
+    }
+  );
+  
+      if (error) {
+        console.error("Failed saving score prediction:", error);
+        return;
+      }
+  
+      await loadCurrentUserPredictionData();
+      showSaveNotice("Score prediction saved ✅");
+    } catch (err) {
+      console.error("Unexpected updateScorePrediction error:", err);
+    }
+  }
 
   const updateChampionTiebreak = (participantId, value) => {
     updateState({
@@ -2229,6 +2362,66 @@ await loadCurrentUserPredictionData();
                           ))}
                         </div>
 
+                        {allowsScorePrediction(match) ? (
+  <div className="score-prediction-panel">
+    <div className="score-prediction-title">
+      Exact score prediction
+    </div>
+
+    <div className="score-prediction-row">
+      <input
+        className="score-input"
+        type="number"
+        min="0"
+        placeholder={match.home}
+        disabled={editingDisabled}
+        value={scorePredictions[String(match.id)]?.home || ""}
+        onChange={(e) =>
+          setScorePredictions((prev) => ({
+            ...prev,
+            [String(match.id)]: {
+              home: e.target.value,
+              away: prev[String(match.id)]?.away || "",
+            },
+          }))
+        }
+      />
+
+      <span className="score-separator">:</span>
+
+      <input
+        className="score-input"
+        type="number"
+        min="0"
+        placeholder={match.away}
+        disabled={editingDisabled}
+        value={scorePredictions[String(match.id)]?.away || ""}
+        onChange={(e) =>
+          setScorePredictions((prev) => ({
+            ...prev,
+            [String(match.id)]: {
+              home: prev[String(match.id)]?.home || "",
+              away: e.target.value,
+            },
+          }))
+        }
+      />
+
+      <button
+        className="btn-primary"
+        disabled={editingDisabled}
+        onClick={() => updateScorePrediction(match.id)}
+      >
+        Save score
+      </button>
+    </div>
+
+    <div className="score-prediction-help">
+      Exact score bonus: 3 points
+    </div>
+  </div>
+) : null}
+
                         <div className="match-result-text">
                           Current prediction:{" "}
                           <strong>{outcomeLabel(currentPick, match)}</strong>
@@ -3101,6 +3294,35 @@ const css = `
     color: #334155;
   }
   
+  .score-prediction-panel {
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 18px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+  }
+  
+  .score-prediction-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 10px;
+  }
+  
+  .score-prediction-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  
+  .score-prediction-help {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.45;
+  }
+
   .btn-primary,
   .btn-secondary,
   .btn-danger,
@@ -3924,6 +4146,19 @@ const css = `
     width: 100%;
     justify-content: center;
     text-align: center;
+  }
+
+  .score-prediction-row {
+    align-items: stretch;
+  }
+  
+  .score-prediction-row .score-input {
+    flex: 1;
+    min-width: 72px;
+  }
+  
+  .score-prediction-row .btn-primary {
+    width: 100%;
   }
 
     .dashboard-title {
