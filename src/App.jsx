@@ -959,6 +959,8 @@ setAllSharedScorePredictions(mappedScorePredictions);
       return {
         ...participant,
         points,
+        outcomePoints,
+scorePoints,
         hits,
         entered,
         completion: effectiveMatches.length
@@ -2600,8 +2602,8 @@ await loadCurrentUserPredictionData();
                             <div className="table-meta">{row.email || "No email"}</div>
                           </td>
                           <td className="td-strong">{row.points}</td>
-                          <td>{row.outcomePoints}</td>
-<td>{row.scorePoints}</td>
+<td>{row.outcomePoints ?? 0}</td>
+<td>{row.scorePoints ?? 0}</td>
                           <td>
                             {row.championPick}
                             {effectiveActualChampion && row.championHit === 1 ? (
