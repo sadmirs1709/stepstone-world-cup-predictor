@@ -1027,7 +1027,7 @@ const matchProgressPct = totalTournamentMatches
   ? Math.round((completedMatches / totalTournamentMatches) * 100)
   : 0;
 
-const currentStageLabel = "Group Stage";
+  const currentStageLabel = "Knockout Stage";
 
   const totalPredictions =
   competitionParticipants.length * effectiveMatches.length;
@@ -1933,10 +1933,10 @@ await loadCurrentUserPredictionData();
                   label="Predictions"
                   value={effectiveLockPredictions ? "Lock at kickoff" : "Open editing"}
                 />
-                <StatusPill
-                  label="Scoring"
-                  value={`${effectivePointsPerHit} point per correct outcome`}
-                />
+<StatusPill
+  label="Scoring"
+  value={`${effectivePointsPerHit} point${effectivePointsPerHit === 1 ? "" : "s"} per correct outcome · 3 points per correct score`}
+/>
               </div>
 
               <div className="dashboard-user-row">
