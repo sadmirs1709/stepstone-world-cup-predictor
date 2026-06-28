@@ -1000,13 +1000,11 @@ setAllSharedScorePredictions(mappedScorePredictions);
           ).length;
 
           return {
-  participantId: participant.id,
-  name: participant.name,
-  hits,
-  points,
-  outcomePoints,
-  scorePoints,
-};
+            participantId: participant.id,
+            name: participant.name,
+            hits,
+            points: hits * effectivePointsPerHit,
+          };
         })
         .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     }
