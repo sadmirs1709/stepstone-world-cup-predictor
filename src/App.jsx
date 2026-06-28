@@ -898,6 +898,8 @@ setAllSharedScorePredictions(mappedScorePredictions);
 
   const leaderboard = useMemo(() => {
     const rows = competitionParticipants.map((participant) => {
+      let outcomePoints = 0;
+      let scorePoints = 0;
       let points = 0;
       let hits = 0;
       let entered = 0;
@@ -921,7 +923,7 @@ setAllSharedScorePredictions(mappedScorePredictions);
         if (hasOutcomePick || hasScorePick) entered += 1;
       
         if (hasOutcomePick && match.result && pick === match.result) {
-          points += effectivePointsPerHit;
+          outcomePoints += effectivePointsPerHit;
           hits += 1;
         }
       
@@ -938,11 +940,13 @@ setAllSharedScorePredictions(mappedScorePredictions);
           Number(scorePick.home) === Number(match.homeScore) &&
           Number(scorePick.away) === Number(match.awayScore);
       
-        if (exactScoreCorrect) {
-          points += 3;
-        }
+          if (exactScoreCorrect) {
+            scorePoints += 3;
+          }
       }
       
+      points = outcomePoints + scorePoints;
+
       const championPick = effectiveAllChampionPicks[String(participant.id)] || "";
       const championHit =
         effectiveActualChampion &&
@@ -996,11 +1000,13 @@ setAllSharedScorePredictions(mappedScorePredictions);
           ).length;
 
           return {
-            participantId: participant.id,
-            name: participant.name,
-            hits,
-            points: hits * effectivePointsPerHit,
-          };
+  participantId: participant.id,
+  name: participant.name,
+  hits,
+  points,
+  outcomePoints,
+  scorePoints,
+};
         })
         .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
     }
@@ -2574,8 +2580,8 @@ await loadCurrentUserPredictionData();
                         <th>#</th>
                         <th>Name</th>
                         <th>Points</th>
-                        <th>Correct Picks</th>
-                        <th>Completion</th>
+                        <th>Correct Outcome</th>
+                        <th>Correct Score</th>
                         <th>Champion</th>
                       </tr>
                     </thead>
@@ -2596,8 +2602,8 @@ await loadCurrentUserPredictionData();
                             <div className="table-meta">{row.email || "No email"}</div>
                           </td>
                           <td className="td-strong">{row.points}</td>
-                          <td>{row.hits}</td>
-                          <td>{row.completion}%</td>
+                          <td>{row.outcomePoints}</td>
+<td>{row.scorePoints}</td>
                           <td>
                             {row.championPick}
                             {effectiveActualChampion && row.championHit === 1 ? (
