@@ -2512,20 +2512,37 @@ await loadCurrentUserPredictionData();
                           </td>
 
                           {filteredMatches.map((match) => {
-                            const pick =
-                            effectiveAllPredictions[String(participant.id)]?.[String(match.id)] || "";
-                            const correct = match.result && pick === match.result;
+  const pick =
+    effectiveAllPredictions[String(participant.id)]?.[String(match.id)] || "";
 
-                            return (
+    const scorePick =
+    effectiveAllScorePredictions?.[String(participant.id)]?.[String(match.id)];
+  
+  const scoreText =
+    scorePick &&
+    scorePick.home != null &&
+    scorePick.away != null
+      ? `${scorePick.home}-${scorePick.away}`
+      : "";
+
+  const correct = match.result && pick === match.result;
+
+  return (
                               <td key={match.id} className="matrix-body-cell">
                                 <div
                                   className={`matrix-box ${
                                     correct ? "matrix-box-correct" : ""
                                   }`}
                                 >
-                                  <div className="matrix-pick">
-                                    {outcomeBadge(pick, match)}
-                                  </div>
+<div className="matrix-pick">
+  {outcomeBadge(pick, match)}
+</div>
+
+{scoreText && (
+  <div className="matrix-score-pick">
+    Score: {scoreText}
+  </div>
+)}
 
                                   {match.result ? (
                                     <div className="matrix-result-line">
