@@ -192,7 +192,9 @@ function StatusPill({ label, value }) {
   return (
     <div className="status-pill">
       <div className="status-pill-label">{label}</div>
-      <div className="status-pill-value">{value}</div>
+      <div className="status-pill-value" style={{ whiteSpace: "pre-line" }}>
+  {value}
+</div>
     </div>
   );
 }
@@ -1935,7 +1937,9 @@ await loadCurrentUserPredictionData();
                 />
 <StatusPill
   label="Scoring"
-  value={`${effectivePointsPerHit} point per correct outcome • 3 points per correct score • 5 points for correct champion`}
+  value={`1 point per correct outcome
+3 points per correct score
+5 points for correct champion`}
 />
               </div>
 
