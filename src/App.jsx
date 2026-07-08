@@ -1933,10 +1933,10 @@ await loadCurrentUserPredictionData();
                   label="Predictions"
                   value={effectiveLockPredictions ? "Lock at kickoff" : "Open editing"}
                 />
-                <StatusPill
-                  label="Scoring"
-                  value={`${effectivePointsPerHit} point per correct outcome`}
-                />
+<StatusPill
+  label="Scoring"
+  value={`${effectivePointsPerHit} point per correct outcome • 3 points per correct score • 5 points for correct champion`}
+/>
               </div>
 
               <div className="dashboard-user-row">
