@@ -902,6 +902,7 @@ setAllSharedScorePredictions(mappedScorePredictions);
     const rows = competitionParticipants.map((participant) => {
       let points = 0;
       let hits = 0;
+      let exactScores = 0;
       let entered = 0;
 
       for (const match of effectiveMatches) {
@@ -940,9 +941,10 @@ setAllSharedScorePredictions(mappedScorePredictions);
           Number(scorePick.home) === Number(match.homeScore) &&
           Number(scorePick.away) === Number(match.awayScore);
       
-        if (exactScoreCorrect) {
-          points += 3;
-        }
+          if (exactScoreCorrect) {
+            points += 3;
+            exactScores += 1;
+          }
       }
       
       const championPick = effectiveAllChampionPicks[String(participant.id)] || "";
@@ -954,10 +956,15 @@ setAllSharedScorePredictions(mappedScorePredictions);
           ? 1
           : 0;
 
+          if (championHit === 1) {
+            points += 5;
+          }
+
       return {
         ...participant,
         points,
         hits,
+        exactScores,
         entered,
         completion: effectiveMatches.length
           ? Math.round((entered / effectiveMatches.length) * 100)
@@ -2595,8 +2602,8 @@ await loadCurrentUserPredictionData();
                         <th>#</th>
                         <th>Name</th>
                         <th>Points</th>
-                        <th>Correct Picks</th>
-                        <th>Completion</th>
+                        <th>Correct Outcome</th>
+                        <th>Correct Score</th>
                         <th>Champion</th>
                       </tr>
                     </thead>
@@ -2617,9 +2624,9 @@ await loadCurrentUserPredictionData();
                             <div className="table-meta">{row.email || "No email"}</div>
                           </td>
                           <td className="td-strong">{row.points}</td>
-                          <td>{row.hits}</td>
-                          <td>{row.completion}%</td>
-                          <td>
+<td>{row.hits}</td>
+<td>{row.exactScores}</td>
+<td>
                             {row.championPick}
                             {effectiveActualChampion && row.championHit === 1 ? (
   <div className="tie-break-hit">tie-break hit</div>
