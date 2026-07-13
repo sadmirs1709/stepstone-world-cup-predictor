@@ -59,10 +59,10 @@ const DEFAULT_CHAMPIONS = {
 const RULES = [
   "Each participant may submit only one entry.",
   "Predictions are based on the result after regular 90 minutes only (including added time). Extra time and penalty shootouts are not considered.",
-  "Group Stage Scoring: Correct outcome = 1 point. Incorrect outcome = 0 points.",
-  "Knockout Stage Scoring (Round of 32 onwards): Correct outcome = 1 point. Correct exact score = 3 points. Outcome and score predictions are scored independently.",
-  "Tournament Champion Bonus: Correct tournament champion prediction = 5 bonus points.",
-  "If participants finish with the same total number of points, ranking is determined by: Most correct exact score predictions, then most correct outcome predictions, then correct champion prediction, then most knockout-stage points, then alphabetical order."
+  "Group Stage Scoring:\n• Correct outcome = 1 point\n• Incorrect outcome = 0 points",
+  "Knockout Stage Scoring:\n• Correct outcome = 1 point\n• Correct exact score = 3 points",
+  "Tournament Champion:\n• Correct champion prediction = 5 bonus points",
+  "Tie-Breakers:\n• Most correct score points\n• Most correct outcome points\n• Correct champion prediction\n• Most knockout-stage points\n• Alphabetical order"
 ];
 
 function createDefaultState() {
@@ -2666,7 +2666,9 @@ await loadCurrentUserPredictionData();
         {RULES.map((rule, index) => (
           <div key={index} className="rule-item">
             <div className="rule-index">{index + 1}</div>
-            <div>{rule}</div>
+            <div style={{ whiteSpace: "pre-line" }}>
+  {rule}
+</div>
           </div>
         ))}
       </div>
