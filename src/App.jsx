@@ -1036,7 +1036,7 @@ const matchProgressPct = totalTournamentMatches
   ? Math.round((completedMatches / totalTournamentMatches) * 100)
   : 0;
 
-const currentStageLabel = "Group Stage";
+  const currentStageLabel = "Knockout Stage";
 
   const totalPredictions =
   competitionParticipants.length * effectiveMatches.length;
