@@ -943,7 +943,7 @@ setAllSharedScorePredictions(mappedScorePredictions);
       
           if (exactScoreCorrect) {
             points += 3;
-            exactScores += 1;
+            exactScores += 3;
           }
       }
       
