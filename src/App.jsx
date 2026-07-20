@@ -660,9 +660,11 @@ supabase
         { data: predictionRows, error: predictionsError },
         { data: championRows, error: championError },
       ] = await Promise.all([
-        supabase
-          .from("predictions")
-          .select("*"),
+supabase
+  .from("predictions")
+  .select("*")
+  .order("updated_at", { ascending: false })
+  .range(0, 5000),
         supabase
           .from("champion_picks")
           .select("*"),
