@@ -488,6 +488,7 @@ awayScore: row.away_score ?? null,
 supabase
   .from("predictions")
   .select("*")
+  .order("updated_at", { ascending: false })
   .range(0, 5000)
           .eq("user_id", user.id),
         supabase
@@ -709,13 +710,7 @@ const users255 = Object.entries(mappedPredictions)
   .filter(([_, matches]) => matches["255"])
   .length;
 
-alert(
-  `Mapped users
-
-254 = ${users254}
-
-255 = ${users255}`
-);
+alert(`predictionRows length = ${predictionRows.length}`);
 
 setAllSharedPredictions(mappedPredictions);
 setAllSharedScorePredictions(mappedScorePredictions);
