@@ -485,9 +485,10 @@ awayScore: row.away_score ?? null,
         { data: predictionRows, error: predictionsError },
         { data: championRow, error: championError },
       ] = await Promise.all([
-        supabase
-          .from("predictions")
-          .select("*")
+supabase
+  .from("predictions")
+  .select("*")
+  .range(0, 5000)
           .eq("user_id", user.id),
         supabase
           .from("champion_picks")
@@ -699,16 +700,6 @@ for (const row of predictionRows || []) {
         : null,
   };
 }
-
-alert(
-  `Prediction rows loaded: ${predictionRows.length}
-
-Match 254:
-${predictionRows.filter(r => String(r.match_id) === "254").length}
-
-Match 255:
-${predictionRows.filter(r => String(r.match_id) === "255").length}`
-);
 
 setAllSharedPredictions(mappedPredictions);
 setAllSharedScorePredictions(mappedScorePredictions);
