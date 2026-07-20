@@ -701,6 +701,22 @@ for (const row of predictionRows || []) {
   };
 }
 
+const users254 = Object.entries(mappedPredictions)
+  .filter(([_, matches]) => matches["254"])
+  .length;
+
+const users255 = Object.entries(mappedPredictions)
+  .filter(([_, matches]) => matches["255"])
+  .length;
+
+alert(
+  `Mapped users
+
+254 = ${users254}
+
+255 = ${users255}`
+);
+
 setAllSharedPredictions(mappedPredictions);
 setAllSharedScorePredictions(mappedScorePredictions);
       }
