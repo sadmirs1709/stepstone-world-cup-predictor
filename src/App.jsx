@@ -700,6 +700,16 @@ for (const row of predictionRows || []) {
   };
 }
 
+alert(
+  `Prediction rows loaded: ${predictionRows.length}
+
+Match 254:
+${predictionRows.filter(r => String(r.match_id) === "254").length}
+
+Match 255:
+${predictionRows.filter(r => String(r.match_id) === "255").length}`
+);
+
 setAllSharedPredictions(mappedPredictions);
 setAllSharedScorePredictions(mappedScorePredictions);
       }
