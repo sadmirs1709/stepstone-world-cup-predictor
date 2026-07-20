@@ -661,10 +661,12 @@ supabase
         { data: championRows, error: championError },
       ] = await Promise.all([
 supabase
-  .from("predictions")
-  .select("*")
-  .order("updated_at", { ascending: false })
-  .range(0, 5000),
+.from("predictions")
+.select("*")
+.in(
+  "match_id",
+  effectiveMatches.map(m => m.id)
+)
         supabase
           .from("champion_picks")
           .select("*"),
@@ -711,8 +713,6 @@ const users254 = Object.entries(mappedPredictions)
 const users255 = Object.entries(mappedPredictions)
   .filter(([_, matches]) => matches["255"])
   .length;
-
-alert(`predictionRows length = ${predictionRows.length}`);
 
 setAllSharedPredictions(mappedPredictions);
 setAllSharedScorePredictions(mappedScorePredictions);
