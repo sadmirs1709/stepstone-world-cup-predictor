@@ -802,7 +802,7 @@ setAllSharedScorePredictions(mappedScorePredictions);
       setAllSharedChampionPicks({});
       setLoadingAllSharedData(false);
     }
-  }, [user]);
+}, [user, nowTick]);
 
   useEffect(() => {
     if (!isAdmin && currentParticipantId) {
