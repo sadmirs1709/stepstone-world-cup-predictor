@@ -657,19 +657,26 @@ supabase
   
     try {
 const [
-  { data: predictionRows, error: predictionsError },
+  {
+    data: predictionRows,
+    error: predictionsError,
+    count: predictionCount,
+  },
   { data: championRows, error: championError },
 ] = await Promise.all([
-  supabase
-    .from("predictions")
-    .select("*"),
+supabase
+  .from("predictions")
+  .select("*", { count: "exact" }),
 
   supabase
     .from("champion_picks")
     .select("*"),
 ]);
 
-      alert(`predictionRows length = ${predictionRows.length}`);
+alert(
+  `predictionRows length = ${predictionRows.length}
+count = ${predictionCount}`
+);
   
       if (predictionsError) {
         console.error("Failed loading all shared predictions:", predictionsError);
