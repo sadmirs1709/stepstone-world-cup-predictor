@@ -1372,7 +1372,6 @@ const matchProgressPct = totalTournamentMatches
 }
 
 await loadCurrentUserPredictionData();
-await loadAllSharedPredictionData();
 showSaveNotice("Prediction saved ✅");
     } catch (err) {
       console.error("Unexpected updatePrediction error:", err);
@@ -1430,7 +1429,6 @@ showSaveNotice("Prediction saved ✅");
       }
   
 await loadCurrentUserPredictionData();
-await loadAllSharedPredictionData();
 showSaveNotice("Score prediction saved ✅");
     } catch (err) {
       console.error("Unexpected updateScorePrediction error:", err);
