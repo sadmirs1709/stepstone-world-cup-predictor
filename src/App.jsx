@@ -489,7 +489,7 @@ supabase
   .from("predictions")
   .select("*")
   .order("updated_at", { ascending: false })
-  .range(0, 5000)
+  .range(0, 5000),
           .eq("user_id", user.id),
         supabase
           .from("champion_picks")
