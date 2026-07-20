@@ -486,7 +486,6 @@ awayScore: row.away_score ?? null,
         { data: championRow, error: championError },
       ] = await Promise.all([
 supabase
-supabase
   .from("predictions")
   .select("*")
   .order("updated_at", { ascending: false })
