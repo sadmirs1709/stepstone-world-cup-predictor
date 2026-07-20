@@ -666,7 +666,7 @@ supabase
 .in(
   "match_id",
   effectiveMatches.map(m => m.id)
-)
+),
         supabase
           .from("champion_picks")
           .select("*"),
