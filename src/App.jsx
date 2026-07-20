@@ -667,10 +667,13 @@ supabase
   "match_id",
   effectiveMatches.map(m => m.id)
 ),
+
         supabase
           .from("champion_picks")
           .select("*"),
       ]);
+
+      alert(`predictionRows length = ${predictionRows.length}`);
   
       if (predictionsError) {
         console.error("Failed loading all shared predictions:", predictionsError);
