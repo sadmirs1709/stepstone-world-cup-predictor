@@ -656,18 +656,18 @@ supabase
     setLoadingAllSharedData(true);
   
     try {
-      const [
-        { data: predictionRows, error: predictionsError },
-        { data: championRows, error: championError },
-      ] = await Promise.all([
-supabase
-.from("predictions")
-.select("*")
+const [
+  { data: predictionRows, error: predictionsError },
+  { data: championRows, error: championError },
+] = await Promise.all([
+  supabase
+    .from("predictions")
+    .select("*"),
 
-        supabase
-          .from("champion_picks")
-          .select("*"),
-      ]);
+  supabase
+    .from("champion_picks")
+    .select("*"),
+]);
 
       alert(`predictionRows length = ${predictionRows.length}`);
   
